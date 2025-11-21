@@ -100,36 +100,13 @@
     }
 
     async function api(path, opts = {}){
-      // Try Render absolute URL first. Only fallback to relative '/api' when running on localhost/file://
+      // Only use the Render backend as API source
       const token = localStorage.getItem('AUTH_TOKEN');
       const headers = Object.assign({}, opts.headers || {});
       if(token) headers['Authorization'] = 'Bearer ' + token;
-      const absolute = API_BASE + '/api' + path;
-      const relative = '/api' + path;
-
-      // Try absolute endpoint first
-      try{
-        const res = await fetch(absolute, Object.assign({}, opts, {headers}));
-        if(res) return res; // return whatever the backend sent (ok or error)
-      }catch(e){
-        console.warn('Absolute API failed:', e);
-      }
-
-      // Only attempt relative fallback when running locally (developer mode)
-      const host = window.location.hostname;
-      const isLocal = host === 'localhost' || host === '127.0.0.1' || window.location.protocol === 'file:';
-      if(isLocal){
-        try{
-          const r = await fetch(relative, Object.assign({}, opts, {headers}));
-          return r;
-        }catch(err){
-          console.error('Relative API also failed:', err);
-          throw err;
-        }
-      }
-
-      // If not local and absolute failed, throw a clear error so UI can show a message instead of calling Netlify's /api
-      throw new Error('API not reachable (tried Render). Por favor revisa que https://pagina-abuela.onrender.com esté desplegado y accesible.');
+      const url = API_BASE + '/api' + path;
+      const res = await fetch(url, Object.assign({}, opts, {headers}));
+      return res;
     }
 
     async function refreshGallery(){
