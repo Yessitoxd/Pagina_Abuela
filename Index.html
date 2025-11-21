@@ -339,21 +339,20 @@
             galleryPanel.innerHTML = '<p>No hay fotos aún.</p>';
             return;
           }
-          const wrap = document.createElement('div');
-          wrap.style.display = 'flex'; wrap.style.flexWrap = 'wrap'; wrap.style.gap = '0.6rem'; wrap.style.justifyContent = 'center';
+          // Render each image full-width (up to container width), stacked vertically with small gap
           imgs.forEach(i => {
-            const card = document.createElement('figure');
-            card.style.width = '200px'; card.style.margin = '0'; card.style.textAlign = 'center';
             const img = document.createElement('img');
             img.src = API_BASE + '/uploads/' + i.filename;
             img.alt = i.originalname || i.filename;
-            img.style.width = '100%'; img.style.height = '140px'; img.style.objectFit = 'cover'; img.style.borderRadius = '6px'; img.style.border = '1px solid #ddd';
-            const cap = document.createElement('figcaption');
-            cap.textContent = i.uploadedBy ? ('Por: ' + i.uploadedBy) : '';
-            cap.style.fontSize = '0.9rem'; cap.style.color = '#444'; cap.style.paddingTop = '0.4rem';
-            card.appendChild(img); card.appendChild(cap); wrap.appendChild(card);
+            // Show full image (keep aspect ratio), fit within container width
+            img.style.display = 'block';
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.margin = '0 0 8px 0';
+            img.style.borderRadius = '6px';
+            img.style.border = '1px solid #ddd';
+            galleryPanel.appendChild(img);
           });
-          galleryPanel.appendChild(wrap);
         }catch(err){
           console.error(err);
           galleryPanel.innerHTML = '<p>Error al cargar la galería.</p>';
