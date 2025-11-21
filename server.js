@@ -13,6 +13,16 @@ const DB = path.join(__dirname, 'db.json');
 const DEFAULT_USER = 'Rachell';
 const DEFAULT_PASS = '24681012';
 
+// Ensure uploads directory exists (prevents multer write errors on fresh deploys)
+try{
+  if(!fs.existsSync(UPLOADS)){
+    fs.mkdirSync(UPLOADS, { recursive: true });
+    console.log('Created uploads directory at', UPLOADS);
+  }
+}catch(err){
+  console.error('Could not create uploads directory:', err);
+}
+
 // CORS: allow origin from env (Netlify) or all for testing
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
@@ -144,6 +154,11 @@ app.get('/api/info', (req, res) => {
   }
 });
 
+// whoami - validate token and return username
+app.get('/api/me', requireAuth, (req, res) => {
+  res.json({ ok: true, username: req.user });
+});
+
 // optional: remove admin button (not needed server-side, UI removes it) -- route for session invalidation
 app.post('/api/logout', (req, res) => {
   const auth = req.headers['authorization'] || '';
@@ -155,4 +170,29 @@ app.post('/api/logout', (req, res) => {
   res.json({ok:true});
 });
 
+// delete image (admin only)
+app.delete('/api/images/:filename', requireAuth, (req, res) => {
+  const filename = req.params.filename;
+  if(!filename) return res.status(400).json({message:'Falta filename'});
+  const db = readDB();
+  db.images = db.images || [];
+  const idx = db.images.findIndex(i => i.filename === filename);
+  if(idx === -1) return res.status(404).json({message:'Imagen no encontrada'});
+  const meta = db.images[idx];
+  // only allow uploader or admin (DEFAULT_USER)
+  if(meta.uploadedBy !== req.user && req.user !== DEFAULT_USER) return res.status(403).json({message:'No autorizado a borrar esta imagen'});
+  // remove from images
+  db.images.splice(idx,1);
+  // remove from galleries
+  db.galleries = db.galleries || {};
+  Object.keys(db.galleries).forEach(u => {
+    db.galleries[u] = (db.galleries[u] || []).filter(m => m.filename !== filename);
+  });
+  writeDB(db);
+  // remove file from disk (best-effort)
+  try{ const p = path.join(UPLOADS, filename); if(fs.existsSync(p)) fs.unlinkSync(p); }catch(err){ console.warn('Error removing file:', err); }
+  res.json({ok:true});
+});
+
 app.listen(PORT, () => console.log('Server listening on port', PORT));
+console.log('Server base:', { port: PORT, uploadsDir: UPLOADS, dbFile: DB });
