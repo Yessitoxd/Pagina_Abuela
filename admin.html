@@ -47,6 +47,7 @@
     </div>
 
     <section id="adminSection" style="display:none">
+      <p id="adminWelcome" style="font-weight:700;margin-bottom:.6rem;display:none">Aquí subes fotos</p>
       <h2>Subir foto</h2>
       <form id="uploadForm">
         <label>Selecciona una imagen</label>
@@ -66,8 +67,8 @@
   </div>
 
   <script>
-    const loginSection = document.getElementById('loginSection');
-    const adminSection = document.getElementById('adminSection');
+  const loginCard = document.querySelector('.login-card');
+  const adminSection = document.getElementById('adminSection');
     const btnLogin = document.getElementById('btnLogin');
     const btnRegister = document.getElementById('btnRegister');
     const btnLogout = document.getElementById('btnLogout');
@@ -79,14 +80,17 @@
     const gallery = document.getElementById('gallery');
 
     function setAuth(token){
+      const adminWelcome = document.getElementById('adminWelcome');
       if(token){
         localStorage.setItem('AUTH_TOKEN', token);
-        loginSection.style.display = 'none';
+        if(loginCard) loginCard.style.display = 'none';
+        if(adminWelcome) adminWelcome.style.display = 'block';
         adminSection.style.display = 'block';
         btnLogout.style.display = 'inline-block';
       } else {
         localStorage.removeItem('AUTH_TOKEN');
-        loginSection.style.display = 'block';
+        if(loginCard) loginCard.style.display = 'block';
+        if(adminWelcome) adminWelcome.style.display = 'none';
         adminSection.style.display = 'none';
         btnLogout.style.display = 'none';
       }
