@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: Pagina_Abuela
+    env: node
+    branch: main
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    disk: 0
