@@ -100,13 +100,23 @@
     }
 
     async function api(path, opts = {}){
-      // path example: '/images' -> full URL: API_BASE + '/api/images'
+      // Try Render absolute URL first, then fallback to relative '/api' (helps if Netlify serves an older build)
       const token = localStorage.getItem('AUTH_TOKEN');
-      const headers = opts.headers || {};
+      const headers = Object.assign({}, opts.headers || {});
       if(token) headers['Authorization'] = 'Bearer ' + token;
-      const url = API_BASE + '/api' + path;
-      const res = await fetch(url, Object.assign({}, opts, {headers}));
-      return res;
+      const absolute = API_BASE + '/api' + path;
+      const relative = '/api' + path;
+      // Try absolute endpoint
+      try{
+        const res = await fetch(absolute, Object.assign({}, opts, {headers}));
+        // If server responded and it's not a 5xx error, use it
+        if(res && (res.ok || (res.status && res.status < 500))) return res;
+      }catch(e){
+        // network error — will try relative below
+        console.warn('Absolute API failed, falling back to relative API:', e);
+      }
+      // Fallback to relative
+      return await fetch(relative, Object.assign({}, opts, {headers}));
     }
 
     async function refreshGallery(){
