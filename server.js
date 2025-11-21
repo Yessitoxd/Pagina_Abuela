@@ -13,7 +13,8 @@ const DB = path.join(__dirname, 'db.json');
 const DEFAULT_USER = 'Rachell';
 const DEFAULT_PASS = '24681012';
 
-app.use(cors());
+// CORS: allow origin from env (Netlify) or all for testing
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 app.use('/uploads', express.static(UPLOADS));
 app.use(express.static(__dirname)); // serve admin.html and Index.html
@@ -128,6 +129,19 @@ app.get('/api/gallery/:username', (req, res) => {
 app.get('/api/images', (req, res) => {
   const db = readDB();
   res.json(db.images || []);
+});
+
+// simple info / health endpoint for debugging
+app.get('/api/info', (req, res) => {
+  try{
+    const db = readDB();
+    const hasDefault = Array.isArray(db.users) && db.users.some(u => u.username === DEFAULT_USER);
+    const images = db.images || [];
+    const galleries = db.galleries || {};
+    res.json({ ok: true, env: process.env.NODE_ENV || 'development', port: PORT, defaultUser: DEFAULT_USER, hasDefault, imagesCount: images.length, galleriesCount: Object.keys(galleries).length });
+  }catch(err){
+    res.status(500).json({ ok:false, error: String(err) });
+  }
 });
 
 // optional: remove admin button (not needed server-side, UI removes it) -- route for session invalidation
