@@ -330,24 +330,23 @@
       }
 
       // Load gallery images from backend and render into #galleryPanel
+      // Tries /api/images first (metadata stored in db.json). If empty or fails,
+      // falls back to /api/uploads-list which reads the uploads/ directory directly.
       async function loadGallery(){
         const galleryPanel = document.getElementById('galleryPanel');
         if(!galleryPanel) return;
         galleryPanel.innerHTML = '';
-        try{
-          const res = await fetch(API_BASE + '/api/images');
-          if(!res.ok) throw new Error('Error fetching images');
-          const imgs = await res.json();
-          if(!Array.isArray(imgs) || imgs.length === 0){
+
+        async function renderList(list){
+          if(!Array.isArray(list) || list.length === 0){
             galleryPanel.innerHTML = '<p>No hay fotos aún.</p>';
             return;
           }
           // Render each image full-width (up to container width), stacked vertically with small gap
-          imgs.forEach(i => {
+          list.forEach(i => {
             const img = document.createElement('img');
             img.src = i.url || (API_BASE + '/uploads/' + i.filename);
-            img.alt = i.originalname || i.filename;
-            // Show full image (keep aspect ratio), fit within container width
+            img.alt = i.originalname || i.filename || i.url || '';
             img.style.display = 'block';
             img.style.maxWidth = '100%';
             img.style.height = 'auto';
@@ -356,10 +355,33 @@
             img.style.border = '1px solid #ddd';
             galleryPanel.appendChild(img);
           });
-        }catch(err){
-          console.error(err);
-          galleryPanel.innerHTML = '<p>Error al cargar la galería.</p>';
         }
+
+        // Primary: try metadata-backed images
+        try{
+          const res = await fetch(API_BASE + '/api/images');
+          if(res.ok){
+            const imgs = await res.json();
+            if(Array.isArray(imgs) && imgs.length > 0){
+              return renderList(imgs);
+            }
+          }
+        }catch(e){
+          console.warn('api/images failed, falling back to uploads-list', e);
+        }
+
+        // Fallback: list whatever is on disk in uploads/
+        try{
+          const res2 = await fetch(API_BASE + '/api/uploads-list');
+          if(res2.ok){
+            const list = await res2.json();
+            return renderList(list);
+          }
+        }catch(e){
+          console.error('Failed to fetch uploads-list', e);
+        }
+
+        galleryPanel.innerHTML = '<p>Error al cargar la galería.</p>';
       }
 
       // Keep-alive ping to backend to reduce chance of the service idling (also used by UptimeRobot)

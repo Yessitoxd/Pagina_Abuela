@@ -197,6 +197,23 @@ app.get('/api/images', (req, res) => {
   res.json(images);
 });
 
+// list files physically present in uploads/ (useful when files are added to uploads via repo)
+app.get('/api/uploads-list', (req, res) => {
+  try{
+    const files = fs.readdirSync(UPLOADS || '.');
+    const imageExt = ['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg'];
+    const host = req.protocol + '://' + req.get('host');
+    const list = files.filter(f => {
+      const ext = path.extname(f).toLowerCase();
+      return imageExt.includes(ext);
+    }).map(f => ({ filename: f, url: host + '/uploads/' + encodeURIComponent(f) }));
+    res.json(list);
+  }catch(err){
+    console.error('Error reading uploads dir', err);
+    res.status(500).json({ message: 'Error reading uploads directory' });
+  }
+});
+
 // simple info / health endpoint for debugging
 app.get('/api/info', (req, res) => {
   try{
