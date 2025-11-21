@@ -9,12 +9,14 @@
     .wrap{max-width:1100px;margin:2rem auto;padding:1rem}
     h1{font-size:1.4rem;margin:.2rem 0 1rem}
     .demo-row{display:flex;gap:2rem;flex-wrap:wrap}
-    .panel{flex:1 1 520px;background:#fff;padding:1rem;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+  .panel{flex:1 1 520px;background:#fff;padding:1rem;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.06);overflow:hidden}
 
     /* turn.js flipbook sizing */
-    #flipbook{width:100%;height:520px;margin:0 auto}
-    #flipbook .page{background:#fff;display:flex;align-items:center;justify-content:center}
-    #flipbook img{max-width:100%;max-height:100%;display:block}
+  /* Flipbook visual tweaks: make it look like a bound book */
+  #flipbook{width:100%;height:520px;margin:0 auto;position:relative;background:linear-gradient(90deg,#f6f6f6 49.5%, #eee 50%, #f6f6f6 50.5%);border-radius:6px}
+  #flipbook:before{content:'';position:absolute;left:50%;top:0;bottom:0;width:6px;margin-left:-3px;background:linear-gradient(#ddd,#f7f7f7);border-radius:3px;box-shadow:inset 0 0 8px rgba(0,0,0,.05)}
+  #flipbook .page{background:#fff;display:flex;align-items:center;justify-content:center;border-radius:4px;box-shadow:0 8px 18px rgba(0,0,0,.12)}
+  #flipbook img{max-width:100%;max-height:100%;display:block}
 
     /* CSS3D book */
     .book-wrap{perspective:1600px;position:relative;height:520px}
@@ -79,22 +81,29 @@
     /* --- turn.js demo --- */
     (function(){
       const $fb = $('#flipbook');
-      // Build pages: front cover (single), then spreads as pages, back cover
-      // turn.js expects an even number of pages; we'll make each image a page
+      // Build pages: each image becomes a page. Ensure an even number of pages for double display.
       images.forEach((img, i) => {
         const $p = $('<div/>').addClass('page').append($('<img/>',{src: menuPath(img), alt:'Página '+(i+1)}));
+        // mark covers as 'hard' so they look like a real cover
+        if(i===0 || i===images.length-1) $p.addClass('hard');
         $fb.append($p);
       });
+      // If odd number of pages, append a blank page to make it even
+      if(images.length % 2 === 1){
+        $fb.append($('<div/>').addClass('page').html(''));
+      }
 
       // init when images loaded
       function initTurn(){
         $fb.turn({
           width: Math.min(900, window.innerWidth-200),
           height: 520,
-          autoCenter: true
+          autoCenter: true,
+          display: 'double',
+          duration: 600
         });
       }
-      // Wait a tick to ensure images present
+      // initialize after images load
       $(window).on('load', initTurn);
 
       $('#tj-prev').on('click', ()=> $fb.turn('previous'));
