@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Demo Menú — Turn.js & CSS3D</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#fafafa;color:#111}
+    .wrap{max-width:1100px;margin:2rem auto;padding:1rem}
+    h1{font-size:1.4rem;margin:.2rem 0 1rem}
+    .demo-row{display:flex;gap:2rem;flex-wrap:wrap}
+    .panel{flex:1 1 520px;background:#fff;padding:1rem;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+
+    /* turn.js flipbook sizing */
+    #flipbook{width:100%;height:520px;margin:0 auto}
+    #flipbook .page{background:#fff;display:flex;align-items:center;justify-content:center}
+    #flipbook img{max-width:100%;max-height:100%;display:block}
+
+    /* CSS3D book */
+    .book-wrap{perspective:1600px;position:relative;height:520px}
+    .spreads{position:relative;width:100%;height:100%}
+    .spread{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;transition:transform .8s cubic-bezier(.2,.9,.25,1),opacity .3s}
+    .spread img{max-width:48%;max-height:100%;border-radius:8px;border:1px solid #ddd}
+    .spread.hidden{opacity:0;pointer-events:none;transform:translateZ(-60px) scale(.98)}
+    .spread.current{opacity:1;pointer-events:auto;transform:none}
+
+    .controls{display:flex;justify-content:space-between;margin-top:.8rem}
+    .controls button{background:#111;color:#fff;border:0;padding:.6rem .9rem;border-radius:6px;cursor:pointer}
+    .small{font-size:.9rem;padding:.45rem .7rem}
+
+    footer{margin-top:1rem;font-size:.9rem;color:#666}
+  </style>
+  <!-- jQuery + turn.js from CDN -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4.1.0/turn.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Demo: Menú tipo revista — dos versiones (turn.js y CSS3D)</h1>
+    <div class="demo-row">
+      <section class="panel" aria-label="Turn.js demo">
+        <h2>Turn.js (efecto libro)</h2>
+        <div id="flipbook">
+          <!-- pages will be injected -->
+        </div>
+        <div class="controls">
+          <button id="tj-prev" class="small">← Anterior</button>
+          <button id="tj-next" class="small">Siguiente →</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="CSS3D demo">
+        <h2>CSS3D (vanilla)</h2>
+        <div class="book-wrap">
+          <div class="spreads" id="spreads"></div>
+        </div>
+        <div class="controls">
+          <button id="cs-prev" class="small">← Anterior</button>
+          <button id="cs-next" class="small">Siguiente →</button>
+        </div>
+      </section>
+    </div>
+
+    <footer>Demo rápido — coloca tus imágenes en la carpeta <code>Menu/</code> (4 imágenes usadas). Portada, doble página y contraportada.</footer>
+  </div>
+
+  <script>
+    // Filenames (existing in repo Menu/)
+    const images = [
+      'Captura%20de%20pantalla%20%28296%29.png', // portada
+      'Captura%20de%20pantalla%20%28282%29.png', // left page
+      'Captura%20de%20pantalla%20%28281%29.png', // right page
+      'Captura%20de%20pantalla%20%28268%29.png'  // contraportada
+    ];
+
+    // Helper to build URL
+    const menuPath = p => 'Menu/' + p;
+
+    /* --- turn.js demo --- */
+    (function(){
+      const $fb = $('#flipbook');
+      // Build pages: front cover (single), then spreads as pages, back cover
+      // turn.js expects an even number of pages; we'll make each image a page
+      images.forEach((img, i) => {
+        const $p = $('<div/>').addClass('page').append($('<img/>',{src: menuPath(img), alt:'Página '+(i+1)}));
+        $fb.append($p);
+      });
+
+      // init when images loaded
+      function initTurn(){
+        $fb.turn({
+          width: Math.min(900, window.innerWidth-200),
+          height: 520,
+          autoCenter: true
+        });
+      }
+      // Wait a tick to ensure images present
+      $(window).on('load', initTurn);
+
+      $('#tj-prev').on('click', ()=> $fb.turn('previous'));
+      $('#tj-next').on('click', ()=> $fb.turn('next'));
+    })();
+
+    /* --- CSS3D demo (simple spreads navigation) --- */
+    (function(){
+      // We'll build spreads: [cover], [left+right], [back]
+      const spreads = [
+        { imgs: [images[0]] },
+        { imgs: [images[1], images[2]] },
+        { imgs: [images[3]] }
+      ];
+      const container = document.getElementById('spreads');
+      spreads.forEach((s, idx) => {
+        const el = document.createElement('div');
+        el.className = 'spread' + (idx===0? ' current': ' hidden');
+        s.imgs.forEach(src => {
+          const im = document.createElement('img');
+          im.src = menuPath(src);
+          el.appendChild(im);
+        });
+        container.appendChild(el);
+      });
+
+      let cur = 0;
+      const els = container.querySelectorAll('.spread');
+      function show(i){
+        if(i<0 || i>=els.length) return;
+        els[cur].classList.remove('current'); els[cur].classList.add('hidden');
+        els[i].classList.remove('hidden'); els[i].classList.add('current');
+        cur = i;
+      }
+      document.getElementById('cs-prev').addEventListener('click', ()=> show(Math.max(0, cur-1)));
+      document.getElementById('cs-next').addEventListener('click', ()=> show(Math.min(els.length-1, cur+1)));
+    })();
+  </script>
+</body>
+</html>
