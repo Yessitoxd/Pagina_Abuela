@@ -8,6 +8,10 @@ const {randomBytes} = require('crypto');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const app = express();
+// When running behind a proxy (Render, Heroku, etc.), trust the proxy so req.protocol
+// reflects the original request protocol (https). This prevents the server from
+// generating http:// URLs when the external request was https.
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 const UPLOADS = path.join(__dirname, 'uploads');
 const DB = path.join(__dirname, 'db.json');
