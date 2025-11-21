@@ -330,6 +330,18 @@
         refreshGallery();
       }
     })();
+
+    // Keep-alive ping to backend every 5 minutes to help prevent sleeping on free hosting
+    async function keepAliveAdmin(){
+      try{
+        // use api helper (will include token if available)
+        await api('/info');
+      }catch(err){
+        console.debug('admin keepAlive failed', err);
+      }
+    }
+    keepAliveAdmin();
+    setInterval(keepAliveAdmin, 5 * 60 * 1000);
   </script>
 </body>
 </html>

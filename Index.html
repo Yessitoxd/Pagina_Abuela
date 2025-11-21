@@ -359,6 +359,21 @@
         }
       }
 
+      // Keep-alive ping to backend to reduce chance of the service idling (also used by UptimeRobot)
+      // Sends a lightweight request every 5 minutes.
+      async function keepAlive(){
+        try{
+          await fetch(API_BASE + '/api/info', { cache: 'no-store' });
+          // silent success
+        }catch(e){
+          // network errors are ignored
+          console.debug('keepAlive failed', e);
+        }
+      }
+      // ping now and every 5 minutes
+      keepAlive();
+      setInterval(keepAlive, 5 * 60 * 1000);
+
       // Attach listeners once DOM ready
       document.addEventListener('DOMContentLoaded', () => {
   const btnBio = document.getElementById('btnBio');
