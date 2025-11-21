@@ -34,6 +34,7 @@
     <div class="login-card" role="form" aria-label="Ingreso Administrador">
       <h2 class="login-title">Ingreso Administrador</h2>
       <p class="login-sub">Introduce tus credenciales para acceder al panel</p>
+  <p class="muted" style="font-size:.9rem;margin-top:.3rem">Nota: Este panel lee los usuarios administradores desde el backend desplegado en <code>https://pagina-abuela.onrender.com</code></p>
       <label for="user">Usuario</label>
       <input id="user" type="text" placeholder="Usuario" autocomplete="username" />
       <label for="pass">Contraseña</label>
@@ -67,6 +68,8 @@
   </div>
 
   <script>
+  // Base API: apunta al backend desplegado en Render
+  const API_BASE = 'https://pagina-abuela.onrender.com';
   const loginCard = document.querySelector('.login-card');
   const adminSection = document.getElementById('adminSection');
     const btnLogin = document.getElementById('btnLogin');
@@ -97,10 +100,12 @@
     }
 
     async function api(path, opts = {}){
+      // path example: '/images' -> full URL: API_BASE + '/api/images'
       const token = localStorage.getItem('AUTH_TOKEN');
       const headers = opts.headers || {};
       if(token) headers['Authorization'] = 'Bearer ' + token;
-      const res = await fetch('/api' + path, Object.assign({}, opts, {headers}));
+      const url = API_BASE + '/api' + path;
+      const res = await fetch(url, Object.assign({}, opts, {headers}));
       return res;
     }
 
@@ -112,7 +117,8 @@
         const data = await r.json();
         data.forEach(img => {
           const el = document.createElement('img');
-          el.src = '/uploads/' + img.filename;
+          // use uploads served by backend on Render
+          el.src = API_BASE + '/uploads/' + img.filename;
           el.alt = img.originalname || img.filename;
           gallery.appendChild(el);
         });
