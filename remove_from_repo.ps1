@@ -16,7 +16,18 @@ try{ $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition } catch {
 Push-Location $RepoRoot
 Write-Host "Repo root: $RepoRoot"
 
-if($args.Count -eq 0){ Write-Error "Arrastra uno o varios archivos sobre este script o pásalos como argumentos."; Pop-Location; exit 1 }
+if($args.Count -eq 0){
+    # No args: open file picker so the user can select files to remove
+    Add-Type -AssemblyName System.Windows.Forms
+    $uploadsDir = Join-Path $RepoRoot 'uploads'
+    $ofd = New-Object System.Windows.Forms.OpenFileDialog
+    $ofd.Multiselect = $true
+    $ofd.InitialDirectory = (if(Test-Path $uploadsDir) { $uploadsDir } else { $RepoRoot })
+    $ofd.Filter = 'Archivos (típicamente uploads)|*.*'
+    $res = $ofd.ShowDialog()
+    if($res -ne [System.Windows.Forms.DialogResult]::OK){ Write-Host "No se seleccionaron archivos. Abortando."; Pop-Location; exit 0 }
+    $args = $ofd.FileNames
+}
 
 $targets = @()
 foreach($a in $args){
