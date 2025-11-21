@@ -44,12 +44,14 @@
       <div class="controls" style="margin-top:12px">
         <button id="btnLogin" class="primary">Iniciar Sesión</button>
         <button id="btnRegister" class="secondary" style="margin-left:8px">Registrar</button>
-        <button id="btnLogout" style="display:none;background:#666;margin-left:8px">Cerrar sesión</button>
       </div>
       <p id="loginMsg" class="muted" style="margin-top:.6rem"></p>
     </div>
 
     <section id="adminSection" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
+        <button id="btnLogout" style="display:none;background:#666;padding:.5rem .8rem;border-radius:8px;color:#fff;border:0">Cerrar sesión</button>
+      </div>
       <p id="adminWelcome" style="font-weight:700;margin-bottom:.6rem;display:none">Aquí subes fotos</p>
       <h2>Subir foto</h2>
       <form id="uploadForm">
@@ -72,6 +74,19 @@
 
       <h3>Galería</h3>
       <div id="gallery" class="images"></div>
+
+      <!-- Delete confirmation modal -->
+      <div id="deleteModal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);z-index:10000">
+        <div style="background:#fff;padding:1rem;border-radius:8px;max-width:420px;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,0.2)">
+          <h3 id="modalTitle" style="margin-top:0">Confirmar eliminación</h3>
+          <p id="modalText" class="muted">¿Estás segura de que quieres eliminar esta foto?</p>
+          <img id="modalPreview" src="" alt="" style="width:100%;max-height:240px;object-fit:cover;border-radius:6px;border:1px solid #ddd;margin-bottom:.6rem" />
+          <div style="display:flex;gap:.5rem;justify-content:flex-end">
+            <button id="btnCancelDelete" style="background:#ddd;color:#111;padding:.5rem .8rem;border-radius:6px">Cancelar</button>
+            <button id="btnConfirmDelete" style="background:#c62828;color:#fff;padding:.5rem .8rem;border-radius:6px">Eliminar</button>
+          </div>
+        </div>
+      </div>
     </section>
 
   <!-- Footer notes removed so admin is accessible only by direct link -->
@@ -116,8 +131,15 @@
       if(token) headers['Authorization'] = 'Bearer ' + token;
       const url = API_BASE + '/api' + path;
       const res = await fetch(url, Object.assign({}, opts, {headers}));
+      // If the backend returns 401, the token is invalid/expired — clear local session
+      if(res.status === 401){
+        setAuth(null);
+        try{ localStorage.removeItem('AUTH_TOKEN'); }catch(e){}
+      }
       return res;
     }
+
+    let _selectedDelete = null; // filename selected for deletion
 
     async function refreshGallery(){
       gallery.innerHTML = '';
@@ -126,11 +148,44 @@
         if(!r.ok) throw new Error('Error al solicitar imágenes');
         const data = await r.json();
         data.forEach(img => {
+          // wrapper for image + actions
+          const wrap = document.createElement('div');
+          wrap.style.position = 'relative';
+          wrap.style.width = '160px';
+          wrap.style.height = '120px';
+
           const el = document.createElement('img');
-          // use uploads served by backend on Render
+          el.style.width = '100%'; el.style.height = '100%'; el.style.objectFit = 'cover'; el.style.borderRadius = '6px'; el.style.border = '1px solid #ddd';
           el.src = API_BASE + '/uploads/' + img.filename;
           el.alt = img.originalname || img.filename;
-          gallery.appendChild(el);
+          el.dataset.filename = img.filename;
+
+          // delete button (top-right)
+          const btnDel = document.createElement('button');
+          btnDel.textContent = 'Eliminar';
+          btnDel.title = 'Eliminar esta imagen';
+          btnDel.style.position = 'absolute';
+          btnDel.style.top = '6px';
+          btnDel.style.right = '6px';
+          btnDel.style.padding = '4px 8px';
+          btnDel.style.background = 'rgba(198,40,40,0.95)';
+          btnDel.style.color = '#fff';
+          btnDel.style.border = 'none';
+          btnDel.style.borderRadius = '6px';
+          btnDel.style.cursor = 'pointer';
+
+          btnDel.addEventListener('click', (e) => {
+            e.stopPropagation();
+            _selectedDelete = img.filename;
+            const modal = document.getElementById('deleteModal');
+            const modalPreview = document.getElementById('modalPreview');
+            modalPreview.src = API_BASE + '/uploads/' + img.filename;
+            modal.style.display = 'flex';
+          });
+
+          wrap.appendChild(el);
+          wrap.appendChild(btnDel);
+          gallery.appendChild(wrap);
         });
       }catch(e){
         console.error(e);
@@ -162,7 +217,41 @@
       }catch(e){ loginMsg.textContent = 'Error de red'; }
     });
 
-    btnLogout.addEventListener('click', () => { setAuth(null); });
+    btnLogout.addEventListener('click', async () => {
+      // try to notify backend to destroy session, then clear local auth
+      try{
+        await api('/logout', { method: 'POST' });
+      }catch(err){ /* ignore network errors */ }
+      setAuth(null);
+    });
+
+    // delete modal handlers
+    const btnCancelDelete = document.getElementById('btnCancelDelete');
+    const btnConfirmDelete = document.getElementById('btnConfirmDelete');
+    const deleteModal = document.getElementById('deleteModal');
+
+    btnCancelDelete.addEventListener('click', () => {
+      _selectedDelete = null;
+      deleteModal.style.display = 'none';
+      document.getElementById('modalPreview').src = '';
+    });
+
+    btnConfirmDelete.addEventListener('click', async () => {
+      if(!_selectedDelete) return;
+      try{
+        const res = await api('/images/' + encodeURIComponent(_selectedDelete), { method: 'DELETE' });
+        const j = await res.json();
+        if(res.ok){
+          refreshGallery();
+          _selectedDelete = null;
+          deleteModal.style.display = 'none';
+        } else {
+          alert(j.message || 'No se pudo eliminar la imagen');
+        }
+      }catch(err){
+        alert('Error de red eliminando la imagen');
+      }
+    });
 
     btnUpload.addEventListener('click', async () => {
       uploadMsg.textContent = '';
@@ -208,6 +297,11 @@
         try{
           const j = JSON.parse(xhr.responseText || '{}');
           if(xhr.status >=200 && xhr.status < 300){ uploadMsg.textContent = 'Subida correcta.'; showPreview(null); fileInput.value = ''; refreshGallery(); }
+          else if(xhr.status === 401){
+            // unauthorized: clear local session and inform user
+            setAuth(null);
+            uploadMsg.textContent = 'Tu sesión ha expirado o es inválida. Vuelve a iniciar sesión.';
+          }
           else { uploadMsg.textContent = j.message || ('Error al subir: ' + xhr.status); }
         }catch(err){ uploadMsg.textContent = 'Respuesta inválida del servidor'; }
         progressWrap.style.display = 'none';
@@ -219,11 +313,23 @@
 
     btnRefresh.addEventListener('click', () => refreshGallery());
 
-    // If already logged in
-    if(localStorage.getItem('AUTH_TOKEN')){ setAuth(localStorage.getItem('AUTH_TOKEN')); refreshGallery(); }
-
-    // initial gallery load (public)
-    refreshGallery();
+    // If already logged in: validate stored token with the server before trusting it
+    (async function(){
+      const token = localStorage.getItem('AUTH_TOKEN');
+      if(token){
+        try{
+          const res = await api('/me');
+          if(res.ok){ setAuth(token); refreshGallery(); }
+          else { setAuth(null); localStorage.removeItem('AUTH_TOKEN'); refreshGallery(); }
+        }catch(err){
+          // network error or server unreachable: clear local login to avoid stale UI
+          setAuth(null); localStorage.removeItem('AUTH_TOKEN'); refreshGallery();
+        }
+      } else {
+        // no token: public gallery
+        refreshGallery();
+      }
+    })();
   </script>
 </body>
 </html>

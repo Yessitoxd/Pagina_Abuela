@@ -228,6 +228,8 @@
 
   <script>
     (function(){
+      // Backend API base (Render). Ajusta si pruebas en local.
+      const API_BASE = 'https://pagina-abuela.onrender.com';
       const splash = document.getElementById('splash');
       const logo = document.getElementById('logo');
       const tagline = document.getElementById('tagline');
@@ -319,6 +321,42 @@
           } else {
             bioImage.classList.remove('show');
           }
+        }
+        // If gallery is shown, load images from backend
+        if(panelId === 'galleryPanel') loadGallery();
+      }
+
+      // Load gallery images from backend and render into #galleryPanel
+      async function loadGallery(){
+        const galleryPanel = document.getElementById('galleryPanel');
+        if(!galleryPanel) return;
+        galleryPanel.innerHTML = '';
+        try{
+          const res = await fetch(API_BASE + '/api/images');
+          if(!res.ok) throw new Error('Error fetching images');
+          const imgs = await res.json();
+          if(!Array.isArray(imgs) || imgs.length === 0){
+            galleryPanel.innerHTML = '<p>No hay fotos aún.</p>';
+            return;
+          }
+          const wrap = document.createElement('div');
+          wrap.style.display = 'flex'; wrap.style.flexWrap = 'wrap'; wrap.style.gap = '0.6rem'; wrap.style.justifyContent = 'center';
+          imgs.forEach(i => {
+            const card = document.createElement('figure');
+            card.style.width = '200px'; card.style.margin = '0'; card.style.textAlign = 'center';
+            const img = document.createElement('img');
+            img.src = API_BASE + '/uploads/' + i.filename;
+            img.alt = i.originalname || i.filename;
+            img.style.width = '100%'; img.style.height = '140px'; img.style.objectFit = 'cover'; img.style.borderRadius = '6px'; img.style.border = '1px solid #ddd';
+            const cap = document.createElement('figcaption');
+            cap.textContent = i.uploadedBy ? ('Por: ' + i.uploadedBy) : '';
+            cap.style.fontSize = '0.9rem'; cap.style.color = '#444'; cap.style.paddingTop = '0.4rem';
+            card.appendChild(img); card.appendChild(cap); wrap.appendChild(card);
+          });
+          galleryPanel.appendChild(wrap);
+        }catch(err){
+          console.error(err);
+          galleryPanel.innerHTML = '<p>Error al cargar la galería.</p>';
         }
       }
 
