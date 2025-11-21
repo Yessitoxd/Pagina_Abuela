@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>La Abuela — Intro</title>
+  <!-- Montserrat (Extralight) para la cita principal -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;400;700&display=swap" rel="stylesheet">
+  <style>
+    /* Reset & base */
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#222;background:#fff}
+
+  /* Splash overlay */
+  /* Fondo solicitado: siempre blanco desde el inicio */
+  #splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;z-index:9999}
+   /* Hero container: limitar su anchura para evitar que el texto altere el tamaño del logo */
+   #splash .hero{display:flex;flex-direction:column;align-items:center;gap:1rem;width:100%;max-width:90vw;padding:1rem}
+   /* Logo: tamaño fijo relativo al viewport (vmin) y evitar porcentajes respecto al contenedor
+     que provoquen redimensionado cuando el tagline aparece. También evitar que el logo
+     sea flex-item que cambie tamaño. */
+   #splash .logo{width:50vmin;max-width:50vmin;height:auto;display:block;flex:0 0 auto;transform-origin:center center;animation:logoIn 5s cubic-bezier(.22,.9,.36,1) forwards}
+
+    /* Tagline (typewriter)
+       Requerimiento: Bodoni MT en Bold Italic y relleno blanco con trazo negro (estilo outline como en la imagen).
+       Implementación:
+       - font-family: 'Bodoni MT' (sin Times New Roman en la lista para evitar confusión).
+       - color blanco para el relleno y -webkit-text-stroke para el trazo negro (WebKit/Blink). Añadimos text-shadow múltiples como fallback en navegadores que no soporten text-stroke.
+       Nota: si Bodoni MT Bold Italic no está instalada en el sistema, el navegador usará la familia serif por defecto; para garantizar 100% la misma tipografía en todos los equipos puedo embeder el .woff/.ttf si me lo proporcionas.
+    */
+    #tagline{
+      color:#fff; /* fill blanco */
+      font-family:'Bodoni MT',serif; /* sólo Bodoni MT y serif como fallback genérico */
+      font-weight:700;
+      font-style:italic;
+      font-synthesis: none;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      /* Fuerza mayúsculas y separación entre letras */
+      text-transform:uppercase;
+      letter-spacing:0.22em; /* pequeño espacio entre cada letra */
+      /* Tamaño más grande para destacar */
+      font-size:clamp(1.6rem,6vw,4rem);
+    /* Outline / stroke: usamos -webkit-text-stroke cuando existe (Chrome/Safari/Edge).
+      text-shadow se usa solamente como fallback en navegadores que NO soporten -webkit-text-stroke
+      (esto evita que ambos se sumen y creen un doble trazo). */
+    -webkit-text-stroke: 2px #000; /* Chrome, Safari, Edge (Blink) */
+    /* Default: no text-shadow para evitar doble contorno */
+    text-shadow: none;
+      min-height:1.2em;
+      opacity:0;
+    }
+
+    /* Entrance: logo scales from center and fades in over 5s */
+    @keyframes logoIn{
+      0%   {transform:scale(0);opacity:0}
+      100% {transform:scale(1);opacity:1}
+    }
+
+    /* Fade out the splash smoothly (solo cambia opacidad para evitar cambios de tamaño) */
+    .fade-out{animation:fadeOut 5s ease forwards}
+    @keyframes fadeOut{
+      0% {opacity:1}
+      100% {opacity:0}
+    }
+
+    /* When the splash is removed entirely */
+    .hidden{display:none !important}
+
+    /* Main content is initially hidden */
+    #main{min-height:100vh;display:flex;align-items:center;justify-content:center;visibility:hidden;opacity:0;transition:opacity .35s ease,visibility .35s}
+    #main.show{visibility:visible;opacity:1}
+
+  /* Main layout: top buttons and content area */
+  :root{--nav-height:56px}
+
+  /* App shell: add top padding so fixed nav doesn't cover content */
+  .app-shell{width:100%;max-width:1100px;margin:0 auto;padding:calc(1.25rem + var(--nav-height)) 1.25rem 1.25rem}
+
+  /* Fixed top navigation: always visible */
+  .top-nav{
+    /* Make the top nav span the full viewport width so it doesn't appear 'half' when scrolling */
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    width:100%;
+    max-width:none;
+    height:var(--nav-height);
+    display:flex;
+    gap:.5rem;
+    justify-content:flex-end; /* keep buttons at the right inside the full-width bar */
+    align-items:center;
+    padding:6px 1.25rem; /* keep some side padding when full width */
+    z-index:10000;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(4px);
+    /* keep a subtle rounded bottom so the bar feels separated from content */
+    border-bottom-left-radius:8px;
+    border-bottom-right-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  }
+
+  /* inner wrapper keeps the buttons centered within the full-width bar */
+  .nav-inner{display:flex;gap:.5rem;justify-content:flex-end;align-items:center;width:100%;max-width:1100px;margin:0 auto}
+  .nav-toggle{display:none;background:transparent;border:0;font-size:1.05rem;cursor:pointer;padding:.35rem .6rem}
+
+  .top-nav .nav-inner button{background:#fff;border:2px solid #111;padding:.5rem .9rem;border-radius:6px;font-weight:700;cursor:pointer}
+  .top-nav .nav-inner button.active{background:#111;color:#fff}
+
+  .content-area{text-align:center}
+  /* Image hidden until 3s after intro disappears; tamaño reducido para poder agregar más contenido */
+  #bioImage{width:40vmin;max-width:420px;height:auto;display:block;margin:0 auto;opacity:0;transform:translateY(6px);transition:opacity .6s ease,transform .6s ease}
+  #bioImage.show{opacity:1;transform:none}
+
+  .bio-title{font-family:'Montserrat',sans-serif;font-weight:700;margin-top:1rem;margin-bottom:.5rem;font-size:clamp(1.1rem,3vw,1.8rem)}
+  .bio-text{max-width:780px;margin:0.5rem auto;text-align:left;color:#222;line-height:1.5;font-size:clamp(.95rem,1.9vw,1.05rem)}
+
+  /* Gallery & menu placeholders */
+  .panel{display:none;padding:1rem;border-top:1px solid #eee}
+  .panel.show{display:block}
+  .pdf-frame{width:100%;height:70vh;border:0}
+
+  /* Admin panel helpers removed (admin moved to separate admin.html) */
+
+  /* Photo caption (pie de foto) */
+  .bio-figure{margin:0 auto;max-width:720px}
+  .photo-caption{font-family:'Montserrat',sans-serif;font-weight:200;color:#111;text-align:center;margin:0.6rem 0 0;font-size:1rem}
+
+  /* Responsive: mobile layout and hamburger menu */
+  @media (max-width:600px){
+    /* Smaller logo & tagline */
+    #splash .logo{width:36vmin;max-width:36vmin}
+    #tagline{font-size:clamp(1.2rem,8vw,2rem);letter-spacing:0.16em}
+
+    /* Make the nav compact and use a toggle */
+    .top-nav{padding:6px 0;}
+    .nav-toggle{display:block;margin-left:0;margin-right:10px;border:2px solid #111;background:#fff;border-radius:6px}
+    .nav-inner{display:none;flex-direction:column;position:absolute;left:0;right:0;top:var(--nav-height);background:rgba(255,255,255,0.98);padding:8px 1rem;box-shadow:0 6px 18px rgba(0,0,0,0.06);border-bottom-left-radius:8px;border-bottom-right-radius:8px}
+    .top-nav.open .nav-inner{display:flex}
+    .top-nav .nav-inner button{width:100%;text-align:center;padding:.6rem;border-radius:6px}
+
+    /* Reduce padding in app shell on small screens */
+    .app-shell{padding:calc(.8rem + var(--nav-height)) .9rem .9rem}
+    #bioImage{width:70vw;max-width:320px}
+    .pdf-frame{height:60vh}
+  }
+
+    /* Accessibility: respect reduced motion */
+    @media (prefers-reduced-motion: reduce){
+      #splash .logo{animation:none}
+      .fade-out{animation:none;opacity:0}
+    }
+
+    /* Si el navegador NO soporta -webkit-text-stroke, aplicamos text-shadow como fallback */
+    @supports not (-webkit-text-stroke: 1px #000) {
+      #tagline{
+        text-shadow:
+          -2px -2px 0 #000,
+          2px -2px 0 #000,
+          -2px 2px 0 #000,
+          2px 2px 0 #000;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Splash: centered logo + tagline (typewriter) -->
+  <div id="splash" aria-hidden="false">
+    <div class="hero">
+      <!-- IMPORTANT: place abuela.png next to this HTML file with this exact name -->
+      <img id="logo" src="abuela.png" alt="Logo La Abuela" class="logo" />
+      <div id="tagline" aria-hidden="true" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <!-- Main content that appears after the splash -->
+  <main id="main" aria-hidden="true">
+    <div class="app-shell" role="application">
+      <nav class="top-nav" role="navigation" aria-label="Secciones principales">
+        <button class="nav-toggle" aria-expanded="false" aria-controls="navInner" aria-label="Abrir menú">☰</button>
+        <div class="nav-inner" id="navInner">
+          <button id="btnBio" class="active" type="button">Biografía</button>
+          <button id="btnGallery" type="button">Galería de fotos</button>
+          <button id="btnMenu" type="button">Menú</button>
+        </div>
+      </nav>
+
+      <section class="panel content-area" id="bioPanel" aria-hidden="true">
+        <!-- IMPORTANT: coloca Abuela.jpg al lado de Index.html -->
+        <figure class="bio-figure">
+          <img id="bioImage" src="Abuela.jpg" alt="Foto de la Abuela" />
+          <figcaption class="photo-caption">Solo muere quien se olvida. Y este no es el caso.<br>
+          Este lugar es un homenaje a Doña Benita Bertha Valverde Gago (1923-2020), nuestra Abuela. Una mujer pionera y maestra de la gastronomía tradicional. Su espíritu emprendedor y su legado de sazón vive en cada detalle de este proyecto y de cada uno de nosotros. ¡Gracias por ser parte de nuestra historia!</figcaption>
+        </figure>
+        <h2 class="bio-title">¿Quién era La Abuela?</h2>
+        <div class="bio-text">
+          <p><strong>La abuela, que así la llamábamos,</strong> era una gran mujer. Doña Bertita Valverde, quien nació en San Rafael del Sur, el día 7 de diciembre de 1923, falleció el 6 de enero de 2020. Vivió 97 años.</p>
+
+          <p>Desde su niñez fue muy emprendedora. Viajaba con sus padres en carreta hasta El Crucero, a las fincas de café, a vender productos alimenticios: café, pan, venta de horno, frito de cerdo con tortilla, cuajada, nacatamales. Abastecía a los cortadores de café.</p>
+
+          <p>En su juventud, viajaba en las madrugadas en caballo y carreta al ingenio Montelimar, acompañada de su mamá y sus hermanas, a vender productos alimenticios a los trabajadores del ingenio por varios años. En 1947 conoció a su esposo, don Orlando Valle Pérez, con quien procreó 5 hijos.</p>
+
+          <p>Su esposo era beisbolero, promotor y organizador de equipos de béisbol. Doña Bertita, después de casada, continuó con sus emprendimientos, acompañando a su esposo a los cuadros de béisbol, vendiendo carne asada, vigorón, cerdo con yuca, refrescos y sopas. Todos los jugadores la querían mucho.</p>
+
+          <p>Ya ancianita, cuando quedó viuda, se dedicó a vender nacatamales, cajetas de masa y de leche en el casco urbano por pasatiempo. También elaboraba muchas coronas y ramos de difuntos. Tenía un negocio de alquiler de silletas y una sastrería.</p>
+
+          <p>Fue muy reconocida en el municipio y era muy estimada por la gente del pueblo. Doña Bertita motivaba a todos sus hijos y nietos a ser buenos emprendedores. Todos sus hijos son emprendedores y parte de sus nietos también son emprendedores.</p>
+
+          <p>Fue una gran maestra y defensora de su familia y de su iglesia. Cuando perdió su visión, permanecía sentada, cantaba cánticos católicos, rezaba y contaba cuentos a los nietos. Doña Bertita, ejemplo de admiración. En honor a esta gran señora, decidimos que el negocio lleve el nombre “La Abuela”.</p>
+        </div>
+      </section>
+
+      <section id="galleryPanel" class="panel" aria-hidden="true">
+        <p>fotos aqui</p>
+      </section>
+
+      <section id="menuPanel" class="panel" aria-hidden="true">
+        <!-- Visor PDF: usa Mayas.pdf como placeholder. Coloca Mayas.pdf en la misma carpeta. -->
+        <iframe id="pdfViewer" class="pdf-frame" src="Mayas.pdf" title="Menú PDF: Mayas.pdf">Tu navegador no soporta visualización de PDF integrada. Descarga <a href="Mayas.pdf">Mayas.pdf</a></iframe>
+      </section>
+
+      <!-- Admin panel removed: admin.html remains available separately if you need it -->
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      const splash = document.getElementById('splash');
+      const logo = document.getElementById('logo');
+      const tagline = document.getElementById('tagline');
+      const main = document.getElementById('main');
+
+  // Timings (ms)
+  const logoInDuration = 5000; // 5s entrance
+  const typingSpeed = 110; // ms per character (adjustable) — ligeramente más lento para letras grandes
+  const holdAfterTyping = 2000; // time to keep text before fade-out
+  const logoOutDuration = 5000; // 5s exit
+
+  const text = 'RESTAURANTE LA ABUELA';
+
+      function revealMain(){
+        // hide splash and show main content
+        splash.classList.add('hidden');
+        splash.setAttribute('aria-hidden','true');
+        main.classList.add('show');
+        main.setAttribute('aria-hidden','false');
+
+        // Show biography image immediately if the bio panel is active
+        const bioImage = document.getElementById('bioImage');
+        const bioPanel = document.getElementById('bioPanel');
+        if (bioImage && bioPanel && bioPanel.classList.contains('show')) bioImage.classList.add('show');
+      }
+
+      function typeText(str, el, speed){
+        el.setAttribute('aria-hidden','false');
+        el.style.opacity = '1';
+        el.textContent = '';
+        return new Promise(resolve => {
+          let i = 0;
+          const iv = setInterval(() => {
+            el.textContent += str.charAt(i);
+            i++;
+            if(i >= str.length){
+              clearInterval(iv);
+              resolve();
+            }
+          }, speed);
+        });
+      }
+
+      async function startSequence(){
+        // Start typing after logo entrance finishes
+        await new Promise(r => setTimeout(r, logoInDuration));
+        try{
+          await typeText(text, tagline, typingSpeed);
+        }catch(e){
+          tagline.textContent = text; // fallback
+          tagline.style.opacity = '1';
+        }
+
+        // After a short hold, fade out the splash container (no transform on logo)
+        setTimeout(() => {
+          // add fade-out class to the splash container only to avoid double animations on the logo
+          splash.classList.add('fade-out');
+
+          // After the fade-out animation completes, reveal main
+          setTimeout(revealMain, logoOutDuration);
+        }, holdAfterTyping);
+      }
+
+      // --- UI: pestañas / botones ---
+      function showPanel(panelId){
+        ['bioPanel','galleryPanel','menuPanel'].forEach(id => {
+          const el = document.getElementById(id);
+          if(!el) return;
+          if(id === panelId){
+            el.classList.add('show');
+            el.setAttribute('aria-hidden','false');
+          } else {
+            el.classList.remove('show');
+            el.setAttribute('aria-hidden','true');
+          }
+        });
+  // active button (only buttons inside .nav-inner)
+  document.querySelectorAll('.nav-inner button').forEach(btn => btn.classList.remove('active'));
+  if(panelId === 'bioPanel') document.getElementById('btnBio').classList.add('active');
+  if(panelId === 'galleryPanel') document.getElementById('btnGallery').classList.add('active');
+  if(panelId === 'menuPanel') document.getElementById('btnMenu').classList.add('active');
+
+        // Manage photo visibility: only show bioImage when bioPanel is active and main is visible
+        const bioImage = document.getElementById('bioImage');
+        const mainEl = document.getElementById('main');
+        if(bioImage){
+          if(panelId === 'bioPanel' && mainEl && mainEl.classList.contains('show')){
+            bioImage.classList.add('show');
+          } else {
+            bioImage.classList.remove('show');
+          }
+        }
+      }
+
+      // Attach listeners once DOM ready
+      document.addEventListener('DOMContentLoaded', () => {
+  const btnBio = document.getElementById('btnBio');
+  const btnGallery = document.getElementById('btnGallery');
+  const btnMenu = document.getElementById('btnMenu');
+        const nav = document.querySelector('.top-nav');
+        const navToggle = document.querySelector('.nav-toggle');
+
+        if(btnBio) btnBio.addEventListener('click', () => showPanel('bioPanel'));
+        if(btnGallery) btnGallery.addEventListener('click', () => showPanel('galleryPanel'));
+        if(btnMenu) btnMenu.addEventListener('click', () => showPanel('menuPanel'));
+
+        // Toggle mobile menu
+        if(navToggle && nav){
+          navToggle.addEventListener('click', () => {
+            const expanded = navToggle.getAttribute('aria-expanded') === 'true';
+            navToggle.setAttribute('aria-expanded', String(!expanded));
+            nav.classList.toggle('open');
+          });
+        }
+
+        // Close mobile menu when a nav item is clicked (for small screens)
+        document.querySelectorAll('.nav-inner button').forEach(b => b.addEventListener('click', () => {
+          if(window.innerWidth <= 600 && nav){
+            nav.classList.remove('open');
+            const nt = document.querySelector('.nav-toggle');
+            if(nt) nt.setAttribute('aria-expanded','false');
+          }
+        }));
+
+        // Admin button removed; admin is available separately at /admin.html if needed
+
+        // show bio by default
+        showPanel('bioPanel');
+      });
+
+      // Reduced motion: show text immediately and skip long anims
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        tagline.style.opacity = '1';
+        tagline.textContent = text;
+        // quick reveal
+        setTimeout(revealMain, 500);
+      } else {
+        // Kick off sequence (logo CSS animation runs automatically on load)
+        startSequence();
+
+        // Fallback safety: if for some reason the sequence never triggers, ensure removal after a max timeout
+        const maxTotal = logoInDuration + (text.length * typingSpeed) + holdAfterTyping + logoOutDuration + 2000;
+        setTimeout(() => {
+          if (!splash.classList.contains('hidden')) revealMain();
+        }, maxTotal);
+      }
+
+      // Admin inline handlers removed (admin is now a separate page)
+    })();
+  </script>
+</body>
+</html>

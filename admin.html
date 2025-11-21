@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — La Abuela</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;400;700&display=swap" rel="stylesheet">
+  <style>
+    /* Keep project fonts/colors: Montserrat + neutral palette */
+    body{font-family:Montserrat,system-ui,Segoe UI,Arial,sans-serif;margin:0;background:#ffffff;color:#111}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+    h1{margin:0 0 1rem}
+    label{display:block;margin:.5rem 0;font-weight:700;color:#333}
+    input[type=text],input[type=password],input[type=url]{width:100%;padding:.6rem;border:1px solid #ddd;border-radius:8px;background:#fff}
+    button{padding:.6rem .9rem;border-radius:8px;border:0;background:#111;color:#fff;cursor:pointer}
+    .muted{color:#666;font-size:.95rem}
+    .controls{display:flex;gap:.5rem;margin-top:.6rem}
+    .images{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+    .images img{width:160px;height:120px;object-fit:cover;border-radius:6px;border:1px solid #ddd}
+
+    /* Login card centered */
+    .login-card{width:100%;max-width:420px;background:#fff;border:2px solid rgba(0,0,0,0.06);box-shadow:0 8px 30px rgba(0,0,0,0.08);border-radius:12px;padding:1.4rem}
+    .login-title{text-align:center;font-weight:700;margin-bottom:0.6rem}
+    .login-sub{font-size:0.95rem;color:#666;text-align:center;margin-bottom:1rem}
+    .primary{background:#111;color:#fff}
+    .secondary{background:#fff;color:#111;border:2px solid #111}
+    .controls{justify-content:flex-start}
+
+    .upload-area{margin-top:1rem}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="login-card" role="form" aria-label="Ingreso Administrador">
+      <h2 class="login-title">Ingreso Administrador</h2>
+      <p class="login-sub">Introduce tus credenciales para acceder al panel</p>
+      <label for="user">Usuario</label>
+      <input id="user" type="text" placeholder="Usuario" autocomplete="username" />
+      <label for="pass">Contraseña</label>
+      <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password" />
+      <div class="controls" style="margin-top:12px">
+        <button id="btnLogin" class="primary">Iniciar Sesión</button>
+        <button id="btnRegister" class="secondary" style="margin-left:8px">Registrar</button>
+        <button id="btnLogout" style="display:none;background:#666;margin-left:8px">Cerrar sesión</button>
+      </div>
+      <p id="loginMsg" class="muted" style="margin-top:.6rem"></p>
+    </div>
+
+    <section id="adminSection" style="display:none">
+      <h2>Subir foto</h2>
+      <form id="uploadForm">
+        <label>Selecciona una imagen</label>
+        <input id="fileInput" type="file" accept="image/*" />
+        <div class="controls">
+          <button type="button" id="btnUpload">Subir</button>
+          <button type="button" id="btnRefresh" style="background:#0a8a44">Actualizar galería</button>
+        </div>
+        <p id="uploadMsg" class="muted"></p>
+      </form>
+
+      <h3>Galería</h3>
+      <div id="gallery" class="images"></div>
+    </section>
+
+  <!-- Footer notes removed so admin is accessible only by direct link -->
+  </div>
+
+  <script>
+    const loginSection = document.getElementById('loginSection');
+    const adminSection = document.getElementById('adminSection');
+    const btnLogin = document.getElementById('btnLogin');
+    const btnRegister = document.getElementById('btnRegister');
+    const btnLogout = document.getElementById('btnLogout');
+    const loginMsg = document.getElementById('loginMsg');
+    const uploadMsg = document.getElementById('uploadMsg');
+    const fileInput = document.getElementById('fileInput');
+    const btnUpload = document.getElementById('btnUpload');
+    const btnRefresh = document.getElementById('btnRefresh');
+    const gallery = document.getElementById('gallery');
+
+    function setAuth(token){
+      if(token){
+        localStorage.setItem('AUTH_TOKEN', token);
+        loginSection.style.display = 'none';
+        adminSection.style.display = 'block';
+        btnLogout.style.display = 'inline-block';
+      } else {
+        localStorage.removeItem('AUTH_TOKEN');
+        loginSection.style.display = 'block';
+        adminSection.style.display = 'none';
+        btnLogout.style.display = 'none';
+      }
+    }
+
+    async function api(path, opts = {}){
+      const token = localStorage.getItem('AUTH_TOKEN');
+      const headers = opts.headers || {};
+      if(token) headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch('/api' + path, Object.assign({}, opts, {headers}));
+      return res;
+    }
+
+    async function refreshGallery(){
+      gallery.innerHTML = '';
+      try{
+        const r = await api('/images');
+        if(!r.ok) throw new Error('Error al solicitar imágenes');
+        const data = await r.json();
+        data.forEach(img => {
+          const el = document.createElement('img');
+          el.src = '/uploads/' + img.filename;
+          el.alt = img.originalname || img.filename;
+          gallery.appendChild(el);
+        });
+      }catch(e){
+        console.error(e);
+      }
+    }
+
+    // attach events
+    btnLogin.addEventListener('click', async () => {
+      loginMsg.textContent = '';
+      const u = document.getElementById('user').value.trim();
+      const p = document.getElementById('pass').value.trim();
+      if(!u || !p){ loginMsg.textContent = 'Rellena usuario y contraseña.'; return; }
+      try{
+        const res = await fetch('/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const j = await res.json();
+        if(res.ok && j.token){ setAuth(j.token); loginMsg.textContent = 'Acceso correcto.'; refreshGallery(); } else { loginMsg.textContent = j.message || 'Login fallido'; }
+      }catch(e){ loginMsg.textContent = 'Error de red'; }
+    });
+
+    btnRegister.addEventListener('click', async () => {
+      loginMsg.textContent = '';
+      const u = document.getElementById('user').value.trim();
+      const p = document.getElementById('pass').value.trim();
+      if(!u || !p){ loginMsg.textContent = 'Rellena usuario y contraseña.'; return; }
+      try{
+        const res = await fetch('/api/register', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const j = await res.json();
+        if(res.ok){ loginMsg.textContent = 'Usuario registrado. Ahora entra con Entrar.'; } else { loginMsg.textContent = j.message || 'Registro fallido'; }
+      }catch(e){ loginMsg.textContent = 'Error de red'; }
+    });
+
+    btnLogout.addEventListener('click', () => { setAuth(null); });
+
+    btnUpload.addEventListener('click', async () => {
+      uploadMsg.textContent = '';
+      const f = fileInput.files[0];
+      if(!f){ uploadMsg.textContent = 'Selecciona un archivo.'; return; }
+      const fd = new FormData(); fd.append('image', f);
+      try{
+        const res = await api('/upload', {method:'POST', body: fd});
+        const j = await res.json();
+        if(res.ok){ uploadMsg.textContent = 'Subida correcta.'; refreshGallery(); } else { uploadMsg.textContent = j.message || 'Error al subir'; }
+      }catch(e){ uploadMsg.textContent = 'Error de red'; }
+    });
+
+    btnRefresh.addEventListener('click', () => refreshGallery());
+
+    // If already logged in
+    if(localStorage.getItem('AUTH_TOKEN')){ setAuth(localStorage.getItem('AUTH_TOKEN')); refreshGallery(); }
+
+    // initial gallery load (public)
+    refreshGallery();
+  </script>
+</body>
+</html>
