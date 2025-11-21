@@ -215,19 +215,8 @@
 
       <section id="galleryPanel" class="panel" aria-hidden="true">
         <div style="max-width:900px;margin:0 auto;padding:1rem;text-align:center">
-          <!-- Prominent manual adder for quick file additions -->
-          <div id="manualAdder" style="border:2px dashed #e2e2e2;padding:1rem;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.6rem">
-            <button id="btnShowAdd" style="font-size:1.1rem;font-weight:800;padding:.8rem 1.2rem;border-radius:8px;border:2px solid #111;background:#fff;cursor:pointer">AÑADIR AQUÍ</button>
-            <div id="addForm" style="display:none;width:100%;max-width:640px">
-              <p style="margin:.4rem 0;color:#444">Escribe el nombre del archivo que has colocado en la carpeta <code>uploads/</code> y pulsa Añadir.</p>
-              <div style="display:flex;gap:.5rem">
-                <input id="manualFilename" type="text" placeholder="ej: fiesta_2025.jpg" style="flex:1;padding:.6rem;border:1px solid #ddd;border-radius:6px" />
-                <button id="btnAddFile" style="padding:.6rem .9rem;border-radius:6px;background:#111;color:#fff;border:0">Añadir</button>
-              </div>
-            </div>
-          </div>
+          <p style="margin:0;color:#666">Sube fotos desde <a href="admin.html">Admin</a> y se mostrarán aquí.</p>
         </div>
-        <div id="manualNotice" style="max-width:900px;margin:0.6rem auto 0;color:#666;text-align:center;font-size:.95rem">También puedes subir desde <a href="admin.html">Admin</a>.</div>
         <div id="galleryList" style="max-width:900px;margin:1rem auto;padding:0 1rem"></div>
       </section>
 
@@ -375,78 +364,32 @@
 
       // Keep-alive ping to backend to reduce chance of the service idling (also used by UptimeRobot)
       // Sends a lightweight request every 5 minutes.
-      async function loadGallery(){
-        const galleryPanel = document.getElementById('galleryPanel');
-        if(!galleryPanel) return;
-        // keep manual adder and notice; clear the galleryList
-        const galleryList = document.getElementById('galleryList');
-        if(galleryList) galleryList.innerHTML = '';
-        try{
-          const res = await fetch(API_BASE + '/api/images');
-          if(!res.ok) throw new Error('Error fetching images');
-          const imgs = await res.json();
-          if(!Array.isArray(imgs) || imgs.length === 0){
-            galleryList.innerHTML = '<p>No hay fotos aún.</p>';
-            return;
-          }
-          // Render each image full-width (up to container width), stacked vertically with small gap
-          imgs.forEach(i => {
-            const img = document.createElement('img');
-            img.src = i.url || (API_BASE + '/uploads/' + i.filename);
-            img.alt = i.originalname || i.filename;
-            img.style.display = 'block';
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.margin = '0 0 8px 0';
-            img.style.borderRadius = '6px';
-            img.style.border = '1px solid #ddd';
-            galleryList.appendChild(img);
-          });
-        }catch(err){
-          console.error(err);
-          if(galleryList) galleryList.innerHTML = '<p>Error al cargar la galería.</p>';
-        }
+      function keepAlivePing(){
+        fetch(API_BASE + '/api/info').catch(() => {});
       }
+      // Fire one immediately and then every 5 minutes
+      keepAlivePing();
+      setInterval(keepAlivePing, 5 * 60 * 1000);
 
-      // Manual adder handlers
+      // DOM ready: wire nav toggle and mobile behavior, and show default panel
       document.addEventListener('DOMContentLoaded', () => {
-        const btnShow = document.getElementById('btnShowAdd');
-        const addForm = document.getElementById('addForm');
-        const btnAddFile = document.getElementById('btnAddFile');
-        const manualFilename = document.getElementById('manualFilename');
-        const galleryList = document.getElementById('galleryList');
+        const nav = document.querySelector('.top-nav');
+        const navToggle = document.querySelector('.nav-toggle');
 
-        if(btnShow){
-          btnShow.addEventListener('click', () => {
-            addForm.style.display = addForm.style.display === 'none' ? 'block' : 'none';
-            manualFilename.focus();
-          });
-        }
-
-        if(btnAddFile){
-          btnAddFile.addEventListener('click', () => {
-            const name = (manualFilename.value || '').trim();
-            if(!name) return alert('Escribe el nombre del archivo (ej: foto.jpg)');
-            // Build src using API_BASE uploads path
-            const src = API_BASE + '/uploads/' + encodeURIComponent(name);
-            const img = document.createElement('img');
-            img.src = src;
-            img.alt = name;
-            img.style.display = 'block';
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.margin = '0 0 8px 0';
-            img.style.borderRadius = '6px';
-            img.style.border = '1px solid #ddd';
-            // append at the top of the list
-            if(galleryList) galleryList.insertBefore(img, galleryList.firstChild);
-            manualFilename.value = '';
-          });
-        }
-      });
+        if(navToggle && nav){
+          navToggle.addEventListener('click', () => {
             nav.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', nav.classList.contains('open'));
           });
         }
+
+        // Wire nav buttons (Biografía / Galería / Menú)
+        const btnBio = document.getElementById('btnBio');
+        const btnGallery = document.getElementById('btnGallery');
+        const btnMenu = document.getElementById('btnMenu');
+        if(btnBio) btnBio.addEventListener('click', () => showPanel('bioPanel'));
+        if(btnGallery) btnGallery.addEventListener('click', () => showPanel('galleryPanel'));
+        if(btnMenu) btnMenu.addEventListener('click', () => showPanel('menuPanel'));
 
         // Close mobile menu when a nav item is clicked (for small screens)
         document.querySelectorAll('.nav-inner button').forEach(b => b.addEventListener('click', () => {
@@ -456,8 +399,6 @@
             if(nt) nt.setAttribute('aria-expanded','false');
           }
         }));
-
-        // Admin button removed; admin is available separately at /admin.html if needed
 
         // show bio by default
         showPanel('bioPanel');
