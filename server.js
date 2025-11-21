@@ -5,6 +5,7 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const {randomBytes} = require('crypto');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,22 @@ const UPLOADS = path.join(__dirname, 'uploads');
 const DB = path.join(__dirname, 'db.json');
 const DEFAULT_USER = 'Rachell';
 const DEFAULT_PASS = '24681012';
+
+// S3 configuration (optional). If env vars present we'll upload files to S3 and remove local copy.
+const S3_BUCKET = process.env.S3_BUCKET || null;
+const S3_REGION = process.env.S3_REGION || process.env.AWS_REGION || null;
+const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || null;
+const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || null;
+let s3Client = null;
+if(S3_BUCKET && S3_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY){
+  try{
+    s3Client = new S3Client({ region: S3_REGION, credentials: { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY } });
+    console.log('S3 client configured for bucket', S3_BUCKET, 'region', S3_REGION);
+  }catch(err){
+    console.warn('Failed to configure S3 client:', err);
+    s3Client = null;
+  }
+}
 
 // Ensure uploads directory exists (prevents multer write errors on fresh deploys)
 try{
@@ -113,11 +130,44 @@ function requireAuth(req, res, next){
 }
 
 // upload image (admin only)
-app.post('/api/upload', requireAuth, upload.single('image'), (req, res) => {
+app.post('/api/upload', requireAuth, upload.single('image'), async (req, res) => {
   if(!req.file) return res.status(400).json({message:'No file'});
   const db = readDB();
   db.images = db.images || [];
   const meta = {filename: req.file.filename, originalname: req.file.originalname, uploadedBy: req.user, uploadedAt: Date.now()};
+
+  // If S3 is configured, upload the file there and set meta.url
+  if(s3Client){
+    const localPath = path.join(UPLOADS, req.file.filename);
+    const key = req.file.filename;
+    try{
+      const fileStream = fs.createReadStream(localPath);
+      const put = new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, Body: fileStream, ContentType: req.file.mimetype, ACL: 'public-read' });
+      await s3Client.send(put);
+      // construct public URL (virtual-hosted style)
+      const url = `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/${encodeURIComponent(key)}`;
+      meta.url = url;
+      // push metadata and remove local file
+      db.images.push(meta);
+      db.galleries = db.galleries || {};
+      db.galleries[req.user] = db.galleries[req.user] || [];
+      db.galleries[req.user].push(meta);
+      writeDB(db);
+      try{ if(fs.existsSync(localPath)) fs.unlinkSync(localPath); }catch(e){ console.warn('Could not remove local file after S3 upload', e); }
+      return res.json({ok:true, file: meta});
+    }catch(err){
+      console.error('S3 upload failed', err);
+      // fallback: keep local file and save metadata without url
+      db.images.push(meta);
+      db.galleries = db.galleries || {};
+      db.galleries[req.user] = db.galleries[req.user] || [];
+      db.galleries[req.user].push(meta);
+      writeDB(db);
+      return res.status(500).json({message:'Error uploading to S3'});
+    }
+  }
+
+  // fallback: keep local file and store metadata
   db.images.push(meta);
   // also store per-user gallery (separate storage)
   db.galleries = db.galleries || {};
@@ -138,7 +188,13 @@ app.get('/api/gallery/:username', (req, res) => {
 // list images (public)
 app.get('/api/images', (req, res) => {
   const db = readDB();
-  res.json(db.images || []);
+  const images = (db.images || []).map(img => {
+    // if we have an explicit url (S3), keep it; otherwise build a local uploads URL
+    if(img.url) return img;
+    const host = req.protocol + '://' + req.get('host');
+    return Object.assign({}, img, { url: host + '/uploads/' + img.filename });
+  });
+  res.json(images);
 });
 
 // simple info / health endpoint for debugging
@@ -189,8 +245,15 @@ app.delete('/api/images/:filename', requireAuth, (req, res) => {
     db.galleries[u] = (db.galleries[u] || []).filter(m => m.filename !== filename);
   });
   writeDB(db);
-  // remove file from disk (best-effort)
-  try{ const p = path.join(UPLOADS, filename); if(fs.existsSync(p)) fs.unlinkSync(p); }catch(err){ console.warn('Error removing file:', err); }
+  // remove file from S3 if configured and url present
+  try{
+    if(s3Client && meta.url){
+      const del = new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: filename });
+      s3Client.send(del).catch(e => console.warn('Failed to delete from S3', e));
+    }
+  }catch(err){ console.warn('Error removing file from S3:', err); }
+  // also attempt to remove local file (best-effort)
+  try{ const p = path.join(UPLOADS, filename); if(fs.existsSync(p)) fs.unlinkSync(p); }catch(err){ console.warn('Error removing local file:', err); }
   res.json({ok:true});
 });
 

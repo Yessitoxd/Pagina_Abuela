@@ -156,7 +156,7 @@
 
           const el = document.createElement('img');
           el.style.width = '100%'; el.style.height = '100%'; el.style.objectFit = 'cover'; el.style.borderRadius = '6px'; el.style.border = '1px solid #ddd';
-          el.src = API_BASE + '/uploads/' + img.filename;
+          el.src = img.url || (API_BASE + '/uploads/' + img.filename);
           el.alt = img.originalname || img.filename;
           el.dataset.filename = img.filename;
 
@@ -179,7 +179,7 @@
             _selectedDelete = img.filename;
             const modal = document.getElementById('deleteModal');
             const modalPreview = document.getElementById('modalPreview');
-            modalPreview.src = API_BASE + '/uploads/' + img.filename;
+            modalPreview.src = img.url || (API_BASE + '/uploads/' + img.filename);
             modal.style.display = 'flex';
           });
 

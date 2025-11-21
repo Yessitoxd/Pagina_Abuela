@@ -342,7 +342,7 @@
           // Render each image full-width (up to container width), stacked vertically with small gap
           imgs.forEach(i => {
             const img = document.createElement('img');
-            img.src = API_BASE + '/uploads/' + i.filename;
+            img.src = i.url || (API_BASE + '/uploads/' + i.filename);
             img.alt = i.originalname || i.filename;
             // Show full image (keep aspect ratio), fit within container width
             img.style.display = 'block';
