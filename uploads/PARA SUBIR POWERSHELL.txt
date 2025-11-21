@@ -1,0 +1,8 @@
+“Desde la carpeta del repo” = la raíz del proyecto:
+C:\Users\PC\Desktop\Trabajos DG Programas PC\Abuela\Pagina web
+Allí debe existir la carpeta .git y archivos como Index.html, server.js, uploads, etc.
+Usa PowerShell (los comandos que te doy están pensados para PowerShell en Windows). Los comandos git también funcionan en Git Bash si prefieres.
+Confirmar que estás en la carpeta correcta
+Abre PowerShell y ejecuta:
+
+git add uploads/*; git commit -m "chore: add uploads/ to repo"; git push origin main
