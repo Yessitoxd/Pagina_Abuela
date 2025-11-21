@@ -134,7 +134,7 @@
       const p = document.getElementById('pass').value.trim();
       if(!u || !p){ loginMsg.textContent = 'Rellena usuario y contraseña.'; return; }
       try{
-        const res = await fetch('/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const res = await api('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p})});
         const j = await res.json();
         if(res.ok && j.token){ setAuth(j.token); loginMsg.textContent = 'Acceso correcto.'; refreshGallery(); } else { loginMsg.textContent = j.message || 'Login fallido'; }
       }catch(e){ loginMsg.textContent = 'Error de red'; }
@@ -146,7 +146,7 @@
       const p = document.getElementById('pass').value.trim();
       if(!u || !p){ loginMsg.textContent = 'Rellena usuario y contraseña.'; return; }
       try{
-        const res = await fetch('/api/register', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const res = await api('/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p})});
         const j = await res.json();
         if(res.ok){ loginMsg.textContent = 'Usuario registrado. Ahora entra con Entrar.'; } else { loginMsg.textContent = j.message || 'Registro fallido'; }
       }catch(e){ loginMsg.textContent = 'Error de red'; }
