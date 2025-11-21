@@ -375,13 +375,24 @@
           const res2 = await fetch(API_BASE + '/api/uploads-list');
           if(res2.ok){
             const list = await res2.json();
-            return renderList(list);
+            if(Array.isArray(list) && list.length > 0) return renderList(list);
           }
         }catch(e){
           console.error('Failed to fetch uploads-list', e);
         }
 
-        galleryPanel.innerHTML = '<p>Error al cargar la galería.</p>';
+        // Final fallback: serve files directly from the GitHub repo raw URLs (useful if Render instance disk differs)
+        try{
+          const res3 = await fetch(API_BASE + '/api/uploads-github');
+          if(res3.ok){
+            const ghList = await res3.json();
+            if(Array.isArray(ghList) && ghList.length > 0) return renderList(ghList);
+          }
+        }catch(e){
+          console.error('Failed to fetch uploads-github', e);
+        }
+
+        galleryPanel.innerHTML = '<p>No hay fotos disponibles.</p>';
       }
 
       // Keep-alive ping to backend to reduce chance of the service idling (also used by UptimeRobot)

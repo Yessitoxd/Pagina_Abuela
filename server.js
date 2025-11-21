@@ -214,6 +214,27 @@ app.get('/api/uploads-list', (req, res) => {
   }
 });
 
+// Provide list of upload files hosted in the GitHub repo (raw.githubusercontent) as a fallback
+// Uses the repository owner/name and branch hard-coded from this project. Adjust if you change repo.
+app.get('/api/uploads-github', (req, res) => {
+  try{
+    // GitHub raw URL pattern: https://raw.githubusercontent.com/<owner>/<repo>/<branch>/uploads/<filename>
+    const owner = 'Yessitoxd';
+    const repo = 'Pagina_Abuela';
+    const branch = 'main';
+    // attempt to read local uploads to enumerate filenames; if not present, return empty list
+    let files = [];
+    try{ files = fs.readdirSync(UPLOADS); } catch(e){ files = []; }
+    const imageExt = ['.png','.jpg','.jpeg','.gif','.webp','.bmp','.svg'];
+    const list = files.filter(f => imageExt.includes(path.extname(f).toLowerCase()))
+      .map(f => ({ filename: f, url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/uploads/${encodeURIComponent(f)}` }));
+    res.json(list);
+  }catch(err){
+    console.error('Error building github uploads list', err);
+    res.status(500).json({ message: 'Error building github uploads list' });
+  }
+});
+
 // simple info / health endpoint for debugging
 app.get('/api/info', (req, res) => {
   try{
