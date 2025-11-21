@@ -54,12 +54,20 @@
       <h2>Subir foto</h2>
       <form id="uploadForm">
         <label>Selecciona una imagen</label>
-        <input id="fileInput" type="file" accept="image/*" />
-        <div class="controls">
+        <input id="fileInput" type="file" accept="image/*" style="display:none" />
+        <div id="dropArea" style="border:2px dashed #e2e2e2;padding:1rem;border-radius:8px;text-align:center;cursor:pointer">
+          <div id="dropText">Arrastra una imagen aquí o haz clic para seleccionar</div>
+          <img id="previewImg" src="" alt="" style="display:none;margin-top:.6rem;max-width:160px;max-height:120px;border-radius:6px;border:1px solid #ddd" />
+        </div>
+        <div class="controls" style="margin-top:.6rem">
           <button type="button" id="btnUpload">Subir</button>
           <button type="button" id="btnRefresh" style="background:#0a8a44">Actualizar galería</button>
         </div>
-        <p id="uploadMsg" class="muted"></p>
+        <div id="progressWrap" style="display:none;margin-top:.6rem">
+          <progress id="uploadProgress" value="0" max="100" style="width:100%"></progress>
+          <div id="progressText" class="muted" style="margin-top:.3rem">0%</div>
+        </div>
+        <p id="uploadMsg" class="muted" style="margin-top:.6rem"></p>
       </form>
 
       <h3>Galería</h3>
@@ -160,13 +168,54 @@
       uploadMsg.textContent = '';
       const f = fileInput.files[0];
       if(!f){ uploadMsg.textContent = 'Selecciona un archivo.'; return; }
-      const fd = new FormData(); fd.append('image', f);
-      try{
-        const res = await api('/upload', {method:'POST', body: fd});
-        const j = await res.json();
-        if(res.ok){ uploadMsg.textContent = 'Subida correcta.'; refreshGallery(); } else { uploadMsg.textContent = j.message || 'Error al subir'; }
-      }catch(e){ uploadMsg.textContent = 'Error de red'; }
+      // use XHR to track progress
+      uploadFile(f);
     });
+
+    // drag and drop + preview handling
+    const dropArea = document.getElementById('dropArea');
+    const previewImg = document.getElementById('previewImg');
+    const progressWrap = document.getElementById('progressWrap');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressText = document.getElementById('progressText');
+
+    function showPreview(file){
+      if(!file) { previewImg.style.display = 'none'; previewImg.src = ''; return; }
+      const url = URL.createObjectURL(file);
+      previewImg.src = url; previewImg.style.display = 'block';
+    }
+
+    dropArea.addEventListener('click', () => fileInput.click());
+    dropArea.addEventListener('dragover', (e)=>{ e.preventDefault(); dropArea.style.borderColor = '#9b9b9b'; });
+    dropArea.addEventListener('dragleave', ()=>{ dropArea.style.borderColor = '#e2e2e2'; });
+    dropArea.addEventListener('drop', (e)=>{
+      e.preventDefault(); dropArea.style.borderColor = '#e2e2e2';
+      const dt = e.dataTransfer; const f = dt.files && dt.files[0];
+      if(f){ fileInput.files = dt.files; showPreview(f); }
+    });
+    fileInput.addEventListener('change', (e)=>{ const f = e.target.files[0]; showPreview(f); });
+
+    function uploadFile(file){
+      progressWrap.style.display = 'block'; uploadProgress.value = 0; progressText.textContent = '0%';
+      btnUpload.disabled = true; btnUpload.textContent = 'Subiendo...';
+      const xhr = new XMLHttpRequest();
+      const url = API_BASE + '/api/upload';
+      xhr.open('POST', url, true);
+      const token = localStorage.getItem('AUTH_TOKEN');
+      if(token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.upload.onprogress = function(e){ if(e.lengthComputable){ const pct = Math.round((e.loaded / e.total) * 100); uploadProgress.value = pct; progressText.textContent = pct + '%'; } };
+      xhr.onload = function(){ btnUpload.disabled = false; btnUpload.textContent = 'Subir';
+        try{
+          const j = JSON.parse(xhr.responseText || '{}');
+          if(xhr.status >=200 && xhr.status < 300){ uploadMsg.textContent = 'Subida correcta.'; showPreview(null); fileInput.value = ''; refreshGallery(); }
+          else { uploadMsg.textContent = j.message || ('Error al subir: ' + xhr.status); }
+        }catch(err){ uploadMsg.textContent = 'Respuesta inválida del servidor'; }
+        progressWrap.style.display = 'none';
+      };
+      xhr.onerror = function(){ uploadMsg.textContent = 'Error de red durante la subida'; btnUpload.disabled = false; btnUpload.textContent = 'Subir'; progressWrap.style.display = 'none'; };
+      const fd = new FormData(); fd.append('image', file);
+      xhr.send(fd);
+    }
 
     btnRefresh.addEventListener('click', () => refreshGallery());
 
