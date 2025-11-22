@@ -157,12 +157,17 @@
     .pdf-frame{height:60vh}
 
     /* Mobile menu: make the viewer shorter and images full-width for readability */
-    #menuViewer.spreads, #menuViewer{height:60vh}
-    #menuViewer .spread{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;height:100%;}
-    /* On small screens prefer width-based sizing so text is readable */
-    #menuViewer .spread img{width:100%;height:auto;object-fit:contain;border:none !important;box-shadow:none !important;border-radius:0 !important}
-    /* Stack double spreads vertically on narrow screens */
-    #menuViewer .spread.double{flex-direction:column}
+   #menuViewer.spreads, #menuViewer{height:60vh}
+   /* On mobile prefer flexible layout but keep doubles side-by-side.
+     Use row layout for .double so pages 2+3 and 4+5 appear next to each other.
+     Images will scale to fit horizontally but preserve legibility. */
+   #menuViewer .spread{position:relative;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;height:100%;padding:0 8px}
+   /* Single: take most of the width */
+   #menuViewer .spread.single{justify-content:center}
+   #menuViewer .spread.single img{width:92%;height:auto;object-fit:contain;border:none !important;box-shadow:none !important;border-radius:0 !important}
+   /* Double: show images side-by-side and scale to available width */
+   #menuViewer .spread.double{flex-direction:row}
+   #menuViewer .spread.double img{width:48%;height:auto;object-fit:contain;border:none !important;box-shadow:none !important;border-radius:0 !important}
 
     /* Download button tweaks on mobile: slightly smaller and inset */
     .download-wrap{right:0.6rem;top:calc(var(--nav-height) + 8px)}
@@ -191,6 +196,33 @@
       .tagline-split{display:block;text-align:center;margin-left:0}
       #tagline{white-space:normal}
     }
+  </style>
+  <style>
+    /* Lightbox / overlay viewer for gallery images */
+    #lightbox{
+      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:20000;background:rgba(0,0,0,0.8);opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s;
+    }
+    #lightbox.show{opacity:1;visibility:visible}
+    #lightbox-img{max-width:90vw;max-height:90vh;border-radius:6px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+    #lightbox-close{position:fixed;top:calc(var(--nav-height) + 12px);right:12px;background:#111;color:#fff;border:0;padding:.5rem .7rem;border-radius:8px;cursor:pointer;z-index:20001}
+    /* On small screens move the close button slightly inward */
+    @media (max-width:600px){ #lightbox-close{right:8px;top:calc(var(--nav-height) + 8px)} }
+  </style>
+  <style>
+    /* Gallery loading indicator */
+    .gallery-loading{display:none;gap:10px;color:#333;font-family:inherit;align-items:center}
+    .gallery-loading .loading-label{font-weight:600}
+
+    /* Simple dot spinner */
+    .spinner-dots{width:18px;height:18px;position:relative}
+    .spinner-dots::before,.spinner-dots::after,.spinner-dots span{content:'';position:absolute;top:50%;left:50%;width:6px;height:6px;border-radius:50%;background:#111;transform:translate(-50%,-50%);opacity:0.9}
+    .spinner-dots::before{left:30%;animation:dot1 1s infinite}
+    .spinner-dots::after{left:70%;animation:dot2 1s infinite}
+    .spinner-dots span{left:50%;animation:dot3 1s infinite}
+
+    @keyframes dot1{0%{transform:translate(-50%,-50%) scale(1);opacity:.3}50%{transform:translate(-50%,-50%) scale(1.6);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:.3}}
+    @keyframes dot2{0%{transform:translate(-50%,-50%) scale(1);opacity:.3}50%{transform:translate(-50%,-50%) scale(1.6);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:.3}}
+    @keyframes dot3{0%{transform:translate(-50%,-50%) scale(1);opacity:.3}50%{transform:translate(-50%,-50%) scale(1.6);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:.3}}
   </style>
   <style>
     /* Menu viewer styles (only affect the menu panel) */
@@ -280,10 +312,11 @@
       </section>
 
       <section id="galleryPanel" class="panel" aria-hidden="true">
-        <div style="max-width:900px;margin:0 auto;padding:1rem;text-align:center">
-          <p style="margin:0;color:#666">Sube fotos desde <a href="admin.html">Admin</a> y se mostrarán aquí.</p>
-        </div>
-        <div id="galleryList" style="max-width:900px;margin:1rem auto;padding:0 1rem"></div>
+            <div id="galleryLoading" class="gallery-loading" aria-hidden="true" style="max-width:900px;margin:1rem auto;padding:0 1rem;display:none;align-items:center;justify-content:center;">
+              <div class="spinner-dots" aria-hidden="true" style="margin-right:12px"></div>
+              <div class="loading-label">Cargando fotos…</div>
+            </div>
+            <div id="galleryList" style="max-width:900px;margin:1rem auto;padding:0 1rem"></div>
       </section>
 
       <section id="menuPanel" class="panel" aria-hidden="true">
@@ -300,6 +333,12 @@
       <!-- Admin panel removed: admin.html remains available separately if you need it -->
     </div>
   </main>
+
+  <!-- Lightbox overlay (hidden by default) -->
+  <div id="lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+    <button id="lightbox-close" aria-label="Cerrar visor">✕</button>
+    <img id="lightbox-img" src="" alt="" />
+  </div>
 
   <script>
     (function(){
@@ -425,16 +464,60 @@
       async function loadGallery(){
         const galleryPanel = document.getElementById('galleryPanel');
         const galleryList = document.getElementById('galleryList');
+        const galleryLoading = document.getElementById('galleryLoading');
         if(!galleryPanel || !galleryList) return;
+        // Show loading indicator while we fetch and render images
+        if(galleryLoading){
+          galleryLoading.style.display = 'flex';
+          galleryLoading.setAttribute('aria-hidden','false');
+          // ensure the middle dot element exists for the CSS selector
+          const dotSpan = galleryLoading.querySelector('.spinner-dots span');
+          if(!dotSpan){ const s = document.createElement('span'); galleryLoading.querySelector('.spinner-dots').appendChild(s); }
+        }
         galleryList.innerHTML = '';
 
         // helper to normalize received items into { url, alt }
         function normalizeArray(arr, type){
-          return arr.map(i => {
-            if(type === 'api') return { url: i.url || (API_BASE + '/uploads/' + i.filename), alt: i.originalname || i.filename || '' };
-            if(type === 'uploads-list') return { url: API_BASE + '/uploads/' + i, alt: i };
-            if(type === 'github') return { url: i.url, alt: i.name || i.url };
-            return { url: i.url || i, alt: i.name || i };
+          return arr.map(item => {
+            // If it's a plain string, treat as filename or direct URL
+            if(typeof item === 'string'){
+              if(type === 'uploads-list') return { url: API_BASE + '/uploads/' + item, alt: item };
+              return { url: item, alt: item };
+            }
+
+            // If it's an object, try common fields in order of usefulness
+            if(typeof item === 'object' && item !== null){
+              const pick = k => (item[k] && typeof item[k] === 'string') ? item[k] : null;
+              const url = pick('url') || pick('download_url') || pick('raw_url') || pick('path') || pick('html_url') || null;
+              const filename = pick('filename') || pick('name') || pick('path') || pick('file') || null;
+              const alt = pick('originalname') || pick('originalName') || pick('name') || filename || '';
+
+              if(url){
+                // If url looks like a GitHub html URL to a blob, convert to raw if possible
+                if(url.includes('github.com') && url.includes('/blob/')){
+                  try{
+                    // transform: https://github.com/:owner/:repo/blob/:branch/:path -> https://raw.githubusercontent.com/:owner/:repo/:branch/:path
+                    const u = new URL(url);
+                    const parts = u.pathname.split('/').filter(Boolean);
+                    const blobIndex = parts.indexOf('blob');
+                    if(blobIndex !== -1 && parts.length > blobIndex + 1){
+                      const owner = parts[0];
+                      const repo = parts[1];
+                      const branch = parts[blobIndex+1];
+                      const filePath = parts.slice(blobIndex+2).join('/');
+                      return { url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`, alt };
+                    }
+                  }catch(e){/* ignore and fallthrough */}
+                }
+                return { url, alt };
+              }
+
+              // Fallback: if we have a filename, assume it's in uploads/
+              if(filename) return { url: API_BASE + '/uploads/' + filename, alt };
+            }
+
+            // As a last resort stringify the item and try to use that (will likely be invalid)
+            return { url: String(item), alt: String(item) };
           });
         }
 
@@ -466,6 +549,7 @@
         }
 
         if(!Array.isArray(images) || images.length === 0){
+          if(galleryLoading){ galleryLoading.style.display = 'none'; galleryLoading.setAttribute('aria-hidden','true'); }
           galleryList.innerHTML = '<p>No hay fotos disponibles.</p>';
           return;
         }
@@ -491,10 +575,17 @@
             img.style.margin = '0 0 12px 0';
             img.style.borderRadius = '6px';
             img.style.border = '1px solid #ddd';
+            img.style.cursor = 'zoom-in';
+            // open lightbox on click
+            img.addEventListener('click', () => {
+              try{ openLightbox(i.url, i.alt); }catch(e){ /* ignore */ }
+            });
             galleryList.appendChild(img);
           });
           page++;
           loading = false;
+          // hide the loading indicator once the first page of images is rendered
+          if(page > 0 && galleryLoading){ galleryLoading.style.display = 'none'; galleryLoading.setAttribute('aria-hidden','true'); }
         }
 
         // initial render
@@ -521,6 +612,40 @@
       // Fire one immediately and then every 5 minutes
       keepAlivePing();
       setInterval(keepAlivePing, 5 * 60 * 1000);
+
+      /* --- Lightbox functions --- */
+      function openLightbox(url, alt){
+        const lb = document.getElementById('lightbox');
+        const lbImg = document.getElementById('lightbox-img');
+        if(!lb || !lbImg) return;
+        lbImg.src = url;
+        lbImg.alt = alt || '';
+        lb.classList.add('show');
+        lb.setAttribute('aria-hidden','false');
+        // prevent background scroll
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeLightbox(){
+        const lb = document.getElementById('lightbox');
+        const lbImg = document.getElementById('lightbox-img');
+        if(!lb || !lbImg) return;
+        lb.classList.remove('show');
+        lb.setAttribute('aria-hidden','true');
+        lbImg.src = '';
+        document.body.style.overflow = '';
+      }
+
+      // Close handlers: button, backdrop click, Esc key
+      document.addEventListener('DOMContentLoaded', ()=>{
+        const lb = document.getElementById('lightbox');
+        const btn = document.getElementById('lightbox-close');
+        if(btn) btn.addEventListener('click', closeLightbox);
+        if(lb){
+          lb.addEventListener('click', (e)=>{ if(e.target === lb) closeLightbox(); });
+        }
+        window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLightbox(); });
+      });
 
       // DOM ready: wire nav toggle and mobile behavior, and show default panel
       document.addEventListener('DOMContentLoaded', () => {
@@ -594,7 +719,7 @@
       // Reduced motion: show text immediately and skip long anims
       if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         tagline.style.opacity = '1';
-        tagline.textContent = text;
+        tagline.textContent = textParts.join('');
         // quick reveal
         setTimeout(revealMain, 500);
       } else {
@@ -602,7 +727,7 @@
         startSequence();
 
         // Fallback safety: if for some reason the sequence never triggers, ensure removal after a max timeout
-        const maxTotal = logoInDuration + (text.length * typingSpeed) + holdAfterTyping + logoOutDuration + 2000;
+  const maxTotal = logoInDuration + (textParts.join('').length * typingSpeed) + holdAfterTyping + logoOutDuration + 2000;
         setTimeout(() => {
           if (!splash.classList.contains('hidden')) revealMain();
         }, maxTotal);
