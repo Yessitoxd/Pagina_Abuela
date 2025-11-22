@@ -5,30 +5,63 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Demo Menú — Turn.js & CSS3D</title>
   <style>
+    /* Page basics */
     body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#fafafa;color:#111}
     .wrap{max-width:1100px;margin:2rem auto;padding:1rem}
     h1{font-size:1.4rem;margin:.2rem 0 1rem}
     .demo-row{display:flex;gap:2rem;flex-wrap:wrap}
-  .panel{flex:1 1 520px;background:#fff;padding:1rem;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.06);overflow:hidden}
 
-    /* turn.js flipbook sizing */
-  /* Flipbook visual tweaks: make it look like a bound book */
-  #flipbook{width:100%;height:520px;margin:0 auto;position:relative;background:linear-gradient(90deg,#f6f6f6 49.5%, #eee 50%, #f6f6f6 50.5%);border-radius:6px}
-  #flipbook:before{content:'';position:absolute;left:50%;top:0;bottom:0;width:6px;margin-left:-3px;background:linear-gradient(#ddd,#f7f7f7);border-radius:3px;box-shadow:inset 0 0 8px rgba(0,0,0,.05)}
-  #flipbook .page{background:#fff;display:flex;align-items:center;justify-content:center;border-radius:4px;box-shadow:0 8px 18px rgba(0,0,0,.12)}
-  #flipbook img{max-width:100%;max-height:100%;display:block}
+    /* Panels (keep visual card look but we'll expand the demo panels below) */
+    .panel{flex:1 1 520px;background:#fff;padding:1rem;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.06);overflow:hidden}
+  /* accessible visually-hidden helper (keep headings for screen readers) */
+  .sr-only{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap;border:0;padding:0;margin:-1px}
 
-    /* CSS3D book */
-    .book-wrap{perspective:1600px;position:relative;height:520px}
-    .spreads{position:relative;width:100%;height:100%}
-    .spread{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;transition:transform .8s cubic-bezier(.2,.9,.25,1),opacity .3s}
-    .spread img{max-width:48%;max-height:100%;border-radius:8px;border:1px solid #ddd}
-    .spread.hidden{opacity:0;pointer-events:none;transform:translateZ(-60px) scale(.98)}
+    /* === Demo-specific overrides: keep the original images untouched ===
+       For the demo panels we remove any decorative styling that would alter
+       the source images (no borders, shadows, rounding or filters). */
+    section[aria-label="Turn.js demo"] img,
+    section[aria-label="CSS3D demo"] img {
+      border: none !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      filter: none !important;
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* turn.js flipbook sizing - expanded so the demo area is roomier */
+    #flipbook{width:100%;height:72vh;margin:0 auto;position:relative;background:none;border-radius:0}
+    /* remove the faux spine so images are shown raw */
+    #flipbook:before{display:none}
+    #flipbook .page{background:transparent;display:flex;align-items:center;justify-content:center;border-radius:0;box-shadow:none}
+    #flipbook img{max-width:100%;max-height:100%;display:block}
+
+    /* CSS3D book (vanilla) - expand allowed width so pages appear larger
+       but keep all changes limited to the demo panels (.panel children). */
+    .book-wrap{perspective:1600px;position:relative;height:72vh;margin:0 auto}
+    .spreads{position:relative;width:100%;max-width:100%;margin:0 auto;height:100%;padding:0 1.5rem}
+    .spread{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:16px;opacity:0;transition:opacity .35s ease;pointer-events:none}
+    /* Make spreads have a fixed visual height; images fill that height so singles and doubles look equally large */
+    .spread{height:100%}
+      /* keep images unmodified (original look) but size them so they fill the spread area
+         Use height:100% for all images so visual height is consistent across singles and doubles.
+         Do not apply per-type max-width that can cause perceived size jumps. */
+      .spread img{height:100%;width:auto;object-fit:contain;border-radius:0;border:none;box-shadow:none;transition:none}
+    .spread.double{display:flex;align-items:center;justify-content:center;gap:8px}
+    .spread.double img{width:auto;max-width:49%}
+    .spread.hidden{opacity:0;pointer-events:none}
     .spread.current{opacity:1;pointer-events:auto;transform:none}
 
+    /* slightly more generous spacing for the demo panels only */
+    section[aria-label="Turn.js demo"],
+    section[aria-label="CSS3D demo"]{
+      padding:1.8rem;
+    }
+
     .controls{display:flex;justify-content:space-between;margin-top:.8rem}
-    .controls button{background:#111;color:#fff;border:0;padding:.6rem .9rem;border-radius:6px;cursor:pointer}
-    .small{font-size:.9rem;padding:.45rem .7rem}
+    .controls button{background:#111;color:#fff;border:0;padding:.5rem .9rem;border-radius:8px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.12)}
+      .small{font-size:.9rem;padding:.45rem .7rem}
 
     footer{margin-top:1rem;font-size:.9rem;color:#666}
   </style>
@@ -52,7 +85,7 @@
       </section>
 
       <section class="panel" aria-label="CSS3D demo">
-        <h2>CSS3D (vanilla)</h2>
+        <h2 class="sr-only">CSS3D (vanilla)</h2>
         <div class="book-wrap">
           <div class="spreads" id="spreads"></div>
         </div>
@@ -67,79 +100,105 @@
   </div>
 
   <script>
-    // Filenames (existing in repo Menu/)
-    const images = [
-      'Captura%20de%20pantalla%20%28296%29.png', // portada
-      'Captura%20de%20pantalla%20%28282%29.png', // left page
-      'Captura%20de%20pantalla%20%28281%29.png', // right page
-      'Captura%20de%20pantalla%20%28268%29.png'  // contraportada
-    ];
-
-    // Helper to build URL
-    const menuPath = p => 'Menu/' + p;
+    // Load menu.json which lists pages and metadata
+    const menuPath = p => 'Menu/' + encodeURIComponent(p);
+    async function loadMenuSpec(){
+      try{
+        const res = await fetch('menu.json');
+        if(!res.ok) throw new Error('menu.json not found');
+        const data = await res.json();
+        return data;
+      }catch(e){
+        console.warn('Could not load menu.json, falling back to defaults', e);
+        return null;
+      }
+    }
 
     /* --- turn.js demo --- */
-    (function(){
+    (async function(){
+      const spec = await loadMenuSpec();
+      const pages = spec && spec.length ? spec.map(s=>s.file) : null;
       const $fb = $('#flipbook');
-      // Build pages: each image becomes a page. Ensure an even number of pages for double display.
-      images.forEach((img, i) => {
-        const $p = $('<div/>').addClass('page').append($('<img/>',{src: menuPath(img), alt:'Página '+(i+1)}));
-        // mark covers as 'hard' so they look like a real cover
-        if(i===0 || i===images.length-1) $p.addClass('hard');
+      const useFiles = pages || [ 'Pagina1-Portada.png','Pagina2.png','Pagina3.png','Pagina4.png' ];
+
+      // Build pages for turn.js and wait for images to load before initializing
+      const pageImgs = [];
+      useFiles.forEach((img, i) => {
+        const $img = $('<img/>',{src: menuPath(img), alt:'Página '+(i+1)});
+        pageImgs.push($img[0]);
+        const $p = $('<div/>').addClass('page').append($img);
+        if(i===0 || i===useFiles.length-1) $p.addClass('hard');
         $fb.append($p);
       });
-      // If odd number of pages, append a blank page to make it even
-      if(images.length % 2 === 1){
-        $fb.append($('<div/>').addClass('page').html(''));
-      }
+      if(useFiles.length % 2 === 1){ $fb.append($('<div/>').addClass('page').html('')); }
 
-      // init when images loaded
       function initTurn(){
-        $fb.turn({
-          width: Math.min(900, window.innerWidth-200),
-          height: 520,
-          autoCenter: true,
-          display: 'double',
-          duration: 600
-        });
+        $fb.turn({ width: Math.min(900, window.innerWidth-200), height: Math.min(window.innerHeight * 0.72, 900), autoCenter:true, display:'double', duration:600 });
       }
-      // initialize after images load
-      $(window).on('load', initTurn);
 
-      $('#tj-prev').on('click', ()=> $fb.turn('previous'));
-      $('#tj-next').on('click', ()=> $fb.turn('next'));
+      // Wait for all page images to finish loading (or error) before init
+      function waitForImages(imgs){
+        return Promise.all(imgs.map(img => new Promise(r => {
+          if(img.complete) return r();
+          img.onload = img.onerror = () => r();
+        })));
+      }
+
+      waitForImages(pageImgs).then(() => {
+        initTurn();
+      }).catch(()=>{ initTurn(); });
+
+      $('#tj-prev').on('click', ()=> $fb.turn && $fb.turn('previous'));
+      $('#tj-next').on('click', ()=> $fb.turn && $fb.turn('next'));
     })();
 
-    /* --- CSS3D demo (simple spreads navigation) --- */
-    (function(){
-      // We'll build spreads: [cover], [left+right], [back]
-      const spreads = [
-        { imgs: [images[0]] },
-        { imgs: [images[1], images[2]] },
-        { imgs: [images[3]] }
-      ];
+    /* --- CSS3D demo (vanilla/simple) --- */
+    (async function(){
+      const spec = await loadMenuSpec();
+      const files = spec && spec.length >= 6 ? spec.map(s=>s.file) : ['Pagina1-Portada.png','Pagina2.png','Pagina3.png','Pagina4.png','Pagina5.png','Pagina6-contra.png'];
+      // Layout: 1, (2+3), (4+5), 6
+      const spreads = [ [files[0]], [files[1], files[2]], [files[3], files[4]], [files[5]] ];
       const container = document.getElementById('spreads');
-      spreads.forEach((s, idx) => {
+      // Create spreads but defer showing until images are preloaded to avoid size jumps
+      const spreadEls = [];
+      spreads.forEach((group, idx) => {
         const el = document.createElement('div');
-        el.className = 'spread' + (idx===0? ' current': ' hidden');
-        s.imgs.forEach(src => {
-          const im = document.createElement('img');
-          im.src = menuPath(src);
+        const typeClass = group.length === 1 ? ' single' : ' double';
+        el.className = 'spread' + typeClass + ' hidden';
+        group.forEach(src => {
+          const im = document.createElement('img'); im.src = menuPath(src); im.alt = '';
           el.appendChild(im);
         });
         container.appendChild(el);
+        spreadEls.push(el);
       });
 
+      // Wait until all images (all spreads) have loaded, then show the first spread
+      const allImgs = Array.from(container.querySelectorAll('img'));
+      function waitAll(imgs){
+        return Promise.all(imgs.map(img => new Promise(r => {
+          if(img.complete) return r();
+          img.onload = img.onerror = () => r();
+        })));
+      }
+
       let cur = 0;
-      const els = container.querySelectorAll('.spread');
       function show(i){
-        if(i<0 || i>=els.length) return;
-        els[cur].classList.remove('current'); els[cur].classList.add('hidden');
-        els[i].classList.remove('hidden'); els[i].classList.add('current');
+        if(i<0 || i>=spreadEls.length) return;
+        spreadEls[cur].classList.remove('current'); spreadEls[cur].classList.add('hidden');
+        spreadEls[i].classList.remove('hidden'); spreadEls[i].classList.add('current');
         cur = i;
       }
+
+      waitAll(allImgs).then(()=>{
+        // reveal the first spread now that images are loaded
+        if(spreadEls[0]){
+          spreadEls[0].classList.remove('hidden'); spreadEls[0].classList.add('current');
+        }
+      });
+
       document.getElementById('cs-prev').addEventListener('click', ()=> show(Math.max(0, cur-1)));
-      document.getElementById('cs-next').addEventListener('click', ()=> show(Math.min(els.length-1, cur+1)));
+      document.getElementById('cs-next').addEventListener('click', ()=> show(Math.min(spreadEls.length-1, cur+1)));
     })();
   </script>
 </body>

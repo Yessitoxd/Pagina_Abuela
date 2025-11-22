@@ -1,5 +1,13 @@
 {
-  "users": [],
+  "users": [
+    {
+      "username": "Rachell",
+      "hash": "$2a$10$YvQW0JP06ptqJcXGcz03mOL0fdtaP1YGcEieQrF9xT97EvZsQTtta"
+    }
+  ],
   "sessions": {},
-  "images": []
+  "images": [],
+  "galleries": {
+    "Rachell": []
+  }
 }

@@ -103,6 +103,15 @@
     box-shadow:0 6px 18px rgba(0,0,0,0.06);
   }
 
+  /* Download button placed below the fixed top-nav at the top-right
+    Hidden by default; shown only when the Menu panel is active via JS */
+  .download-wrap{position:fixed;top:calc(var(--nav-height) + 10px);right:1.25rem;z-index:10001;display:none}
+  .download-btn{background:#111;color:#fff;border:0;padding:.55rem .9rem;border-radius:8px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.12);font-weight:700;text-decoration:none;display:inline-block}
+  @media (max-width:600px){
+    .download-wrap{right:0.6rem;top:calc(var(--nav-height) + 8px)}
+    .download-btn{padding:.45rem .7rem}
+  }
+
   /* inner wrapper keeps the buttons centered within the full-width bar */
   .nav-inner{display:flex;gap:.5rem;justify-content:flex-end;align-items:center;width:100%;max-width:1100px;margin:0 auto}
   .nav-toggle{display:none;background:transparent;border:0;font-size:1.05rem;cursor:pointer;padding:.35rem .6rem}
@@ -146,6 +155,18 @@
     .app-shell{padding:calc(.8rem + var(--nav-height)) .9rem .9rem}
     #bioImage{width:70vw;max-width:320px}
     .pdf-frame{height:60vh}
+
+    /* Mobile menu: make the viewer shorter and images full-width for readability */
+    #menuViewer.spreads, #menuViewer{height:60vh}
+    #menuViewer .spread{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;height:100%;}
+    /* On small screens prefer width-based sizing so text is readable */
+    #menuViewer .spread img{width:100%;height:auto;object-fit:contain;border:none !important;box-shadow:none !important;border-radius:0 !important}
+    /* Stack double spreads vertically on narrow screens */
+    #menuViewer .spread.double{flex-direction:column}
+
+    /* Download button tweaks on mobile: slightly smaller and inset */
+    .download-wrap{right:0.6rem;top:calc(var(--nav-height) + 8px)}
+    .download-btn{padding:.4rem .65rem;font-size:.95rem}
   }
 
     /* Accessibility: respect reduced motion */
@@ -164,6 +185,46 @@
           2px 2px 0 #000;
       }
     }
+    /* tagline parts: make the second part break to its own centered line on small screens */
+    .tagline-split{display:inline}
+    @media (max-width:600px){
+      .tagline-split{display:block;text-align:center;margin-left:0}
+      #tagline{white-space:normal}
+    }
+  </style>
+  <style>
+    /* Menu viewer styles (only affect the menu panel) */
+    .book-wrap{perspective:1600px}
+
+    /* Expand only the menu panel area so images get more room; do NOT affect other panels */
+    #menuPanel{padding:1.8rem}
+    #menuPanel .book-wrap{max-width:1100px;margin:0 auto}
+
+    /* Make the index viewer roomier but keep images unmodified (show originals) */
+    #menuViewer.spreads, #menuViewer{position:relative;width:100%;max-width:1100px;margin:0 auto;height:78vh}
+    #menuViewer .spread{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0;transition:opacity .35s ease;pointer-events:none;height:100%}
+
+    /* IMPORTANT: preserve original images — remove decorative styling here only */
+    #menuViewer .spread img{
+      height:100%;
+      width:auto;
+      object-fit:contain;
+      border:none !important;
+      box-shadow:none !important;
+      border-radius:0 !important;
+      filter:none !important;
+      display:block;
+    }
+
+    /* sizing for single/double spreads */
+    #menuViewer .spread.single img{max-width:92%}
+    #menuViewer .spread.double{display:flex;align-items:center;justify-content:center;gap:8px}
+    #menuViewer .spread.double img{max-width:49%}
+
+    #menuViewer .spread.current{opacity:1;pointer-events:auto;transform:none}
+
+    /* controls style for menu viewer (unchanged look) */
+    #menuPanel .controls button, #menu-prev, #menu-next{background:#111;color:#fff;border:0;padding:.6rem 1rem;border-radius:8px;cursor:pointer}
   </style>
 </head>
 <body>
@@ -187,6 +248,11 @@
           <button id="btnMenu" type="button">Menú</button>
         </div>
       </nav>
+
+      <!-- Download PDF button (Menu) placed below the top navigation, top-right -->
+      <div class="download-wrap">
+        <a class="download-btn" href="Menu Restaurante La Abuela.pdf" download aria-label="Descargar menú en PDF">Descargar menú 📄</a>
+      </div>
 
       <section class="panel content-area" id="bioPanel" aria-hidden="true">
         <!-- IMPORTANT: coloca Abuela.jpg al lado de Index.html -->
@@ -221,8 +287,14 @@
       </section>
 
       <section id="menuPanel" class="panel" aria-hidden="true">
-        <!-- Visor PDF: usa Mayas.pdf como placeholder. Coloca Mayas.pdf en la misma carpeta. -->
-        <iframe id="pdfViewer" class="pdf-frame" src="Mayas.pdf" title="Menú PDF: Mayas.pdf">Tu navegador no soporta visualización de PDF integrada. Descarga <a href="Mayas.pdf">Mayas.pdf</a></iframe>
+        <!-- CSS3D Menu viewer (loads menu.json and images from Menu/) -->
+        <div class="book-wrap" style="max-width:900px;margin:0 auto">
+          <div class="spreads" id="menuViewer" style="height:70vh"></div>
+        </div>
+        <div class="controls" style="max-width:900px;margin:0.6rem auto;display:flex;justify-content:space-between">
+          <button id="menu-prev" class="small">← Anterior</button>
+          <button id="menu-next" class="small">Siguiente →</button>
+        </div>
       </section>
 
       <!-- Admin panel removed: admin.html remains available separately if you need it -->
@@ -244,7 +316,8 @@
   const holdAfterTyping = 2000; // time to keep text before fade-out
   const logoOutDuration = 5000; // 5s exit
 
-  const text = 'RESTAURANTE LA ABUELA';
+  // Split the tagline into two parts so we can control wrapping on small screens
+  const textParts = ['RESTAURANTE ', 'LA ABUELA'];
 
       function revealMain(){
         // hide splash and show main content
@@ -259,30 +332,39 @@
         if (bioImage && bioPanel && bioPanel.classList.contains('show')) bioImage.classList.add('show');
       }
 
-      function typeText(str, el, speed){
+      // Typewriter that supports multiple parts (we create spans so we can
+      // display the second part as a block on small screens)
+      function typeTextParts(parts, el, speed){
         el.setAttribute('aria-hidden','false');
         el.style.opacity = '1';
-        el.textContent = '';
-        return new Promise(resolve => {
-          let i = 0;
-          const iv = setInterval(() => {
-            el.textContent += str.charAt(i);
-            i++;
-            if(i >= str.length){
-              clearInterval(iv);
-              resolve();
-            }
-          }, speed);
+        el.innerHTML = '';
+        const spans = parts.map((p, idx) => {
+          const s = document.createElement('span');
+          s.className = idx === 1 ? 'tagline-split' : 'tagline-part';
+          el.appendChild(s);
+          return s;
         });
+        // chain typing for each part
+        return parts.reduce((prev, part, idx) => {
+          return prev.then(() => new Promise(r => {
+            let i = 0;
+            const span = spans[idx];
+            const iv = setInterval(() => {
+              span.textContent += part.charAt(i++);
+              if(i >= part.length){ clearInterval(iv); r(); }
+            }, speed);
+          }));
+        }, Promise.resolve());
       }
 
       async function startSequence(){
         // Start typing after logo entrance finishes
         await new Promise(r => setTimeout(r, logoInDuration));
         try{
-          await typeText(text, tagline, typingSpeed);
+          await typeTextParts(textParts, tagline, typingSpeed);
         }catch(e){
-          tagline.textContent = text; // fallback
+          // fallback: render both parts (keeps accessibility)
+          tagline.innerHTML = '<span class="tagline-part">' + (textParts[0]||'') + '</span>' + '<span class="tagline-split">' + (textParts[1]||'') + '</span>';
           tagline.style.opacity = '1';
         }
 
@@ -315,6 +397,14 @@
   if(panelId === 'galleryPanel') document.getElementById('btnGallery').classList.add('active');
   if(panelId === 'menuPanel') document.getElementById('btnMenu').classList.add('active');
 
+        // Show the download button only when the Menu panel is active
+        try{
+          const dl = document.querySelector('.download-wrap');
+          if(dl){
+            if(panelId === 'menuPanel') dl.style.display = 'block'; else dl.style.display = 'none';
+          }
+        }catch(e){/* ignore */}
+
         // Manage photo visibility: only show bioImage when bioPanel is active and main is visible
         const bioImage = document.getElementById('bioImage');
         const mainEl = document.getElementById('main');
@@ -329,70 +419,98 @@
         if(panelId === 'galleryPanel') loadGallery();
       }
 
-      // Load gallery images from backend and render into #galleryPanel
-      // Tries /api/images first (metadata stored in db.json). If empty or fails,
-      // falls back to /api/uploads-list which reads the uploads/ directory directly.
+      // Load gallery images with client-side pagination and infinite scroll.
+      // We fetch once (with the same fallback chain) and then paginate in the client
+      // to implement an infinite scroll experience.
       async function loadGallery(){
         const galleryPanel = document.getElementById('galleryPanel');
-        if(!galleryPanel) return;
-        galleryPanel.innerHTML = '';
+        const galleryList = document.getElementById('galleryList');
+        if(!galleryPanel || !galleryList) return;
+        galleryList.innerHTML = '';
 
-        async function renderList(list){
-          if(!Array.isArray(list) || list.length === 0){
-            galleryPanel.innerHTML = '<p>No hay fotos aún.</p>';
-            return;
-          }
-          // Render each image full-width (up to container width), stacked vertically with small gap
-          list.forEach(i => {
-            const img = document.createElement('img');
-            img.src = i.url || (API_BASE + '/uploads/' + i.filename);
-            img.alt = i.originalname || i.filename || i.url || '';
-            img.style.display = 'block';
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.margin = '0 0 8px 0';
-            img.style.borderRadius = '6px';
-            img.style.border = '1px solid #ddd';
-            galleryPanel.appendChild(img);
+        // helper to normalize received items into { url, alt }
+        function normalizeArray(arr, type){
+          return arr.map(i => {
+            if(type === 'api') return { url: i.url || (API_BASE + '/uploads/' + i.filename), alt: i.originalname || i.filename || '' };
+            if(type === 'uploads-list') return { url: API_BASE + '/uploads/' + i, alt: i };
+            if(type === 'github') return { url: i.url, alt: i.name || i.url };
+            return { url: i.url || i, alt: i.name || i };
           });
         }
 
-        // Primary: try metadata-backed images
+        let images = [];
+
+        // Try primary: metadata-backed images
         try{
           const res = await fetch(API_BASE + '/api/images');
           if(res.ok){
             const imgs = await res.json();
-            if(Array.isArray(imgs) && imgs.length > 0){
-              return renderList(imgs);
+            if(Array.isArray(imgs) && imgs.length > 0) images = normalizeArray(imgs, 'api');
+          }
+        }catch(e){ console.warn('api/images failed, falling back to uploads-list', e); }
+
+        // Fallback: uploads-list
+        if(images.length === 0){
+          try{
+            const res2 = await fetch(API_BASE + '/api/uploads-list');
+            if(res2.ok){ const list = await res2.json(); if(Array.isArray(list) && list.length > 0) images = normalizeArray(list, 'uploads-list'); }
+          }catch(e){ console.error('Failed to fetch uploads-list', e); }
+        }
+
+        // Final fallback: GitHub raw list
+        if(images.length === 0){
+          try{
+            const res3 = await fetch(API_BASE + '/api/uploads-github');
+            if(res3.ok){ const gh = await res3.json(); if(Array.isArray(gh) && gh.length > 0) images = normalizeArray(gh, 'github'); }
+          }catch(e){ console.error('Failed to fetch uploads-github', e); }
+        }
+
+        if(!Array.isArray(images) || images.length === 0){
+          galleryList.innerHTML = '<p>No hay fotos disponibles.</p>';
+          return;
+        }
+
+        // client-side pagination
+        const pageSize = 6;
+        let page = 0;
+        let loading = false;
+
+        function renderPage(){
+          if(loading) return;
+          const start = page * pageSize;
+          const slice = images.slice(start, start + pageSize);
+          if(!slice || slice.length === 0) return;
+          loading = true;
+          slice.forEach(i => {
+            const img = document.createElement('img');
+            img.src = i.url;
+            img.alt = i.alt || '';
+            img.style.display = 'block';
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.margin = '0 0 12px 0';
+            img.style.borderRadius = '6px';
+            img.style.border = '1px solid #ddd';
+            galleryList.appendChild(img);
+          });
+          page++;
+          loading = false;
+        }
+
+        // initial render
+        renderPage();
+
+        // infinite scroll (attach once)
+        if(!window._galleryInfiniteAttached){
+          window._galleryInfiniteAttached = true;
+          window.addEventListener('scroll', () => {
+            // only load more when gallery panel is visible
+            if(!document.getElementById('galleryPanel').classList.contains('show')) return;
+            if(window.innerHeight + window.scrollY >= document.body.offsetHeight - 200){
+              renderPage();
             }
-          }
-        }catch(e){
-          console.warn('api/images failed, falling back to uploads-list', e);
+          });
         }
-
-        // Fallback: list whatever is on disk in uploads/
-        try{
-          const res2 = await fetch(API_BASE + '/api/uploads-list');
-          if(res2.ok){
-            const list = await res2.json();
-            if(Array.isArray(list) && list.length > 0) return renderList(list);
-          }
-        }catch(e){
-          console.error('Failed to fetch uploads-list', e);
-        }
-
-        // Final fallback: serve files directly from the GitHub repo raw URLs (useful if Render instance disk differs)
-        try{
-          const res3 = await fetch(API_BASE + '/api/uploads-github');
-          if(res3.ok){
-            const ghList = await res3.json();
-            if(Array.isArray(ghList) && ghList.length > 0) return renderList(ghList);
-          }
-        }catch(e){
-          console.error('Failed to fetch uploads-github', e);
-        }
-
-        galleryPanel.innerHTML = '<p>No hay fotos disponibles.</p>';
       }
 
       // Keep-alive ping to backend to reduce chance of the service idling (also used by UptimeRobot)
@@ -436,6 +554,42 @@
         // show bio by default
         showPanel('bioPanel');
       });
+
+      // --- Menu viewer: simple CSS3D spreads (vanilla) ---
+      (async function(){
+        let spec = null;
+        try{ const res = await fetch('menu.json'); if(res.ok) spec = await res.json(); }catch(e){ /* ignore */ }
+        const files = spec && spec.length >= 6 ? spec.map(s=>s.file) : ['Pagina1-Portada.png','Pagina2.png','Pagina3.png','Pagina4.png','Pagina5.png','Pagina6-contra.png'];
+        const spreads = [ [files[0]], [files[1],files[2]], [files[3],files[4]], [files[5]] ];
+        const container = document.getElementById('menuViewer'); if(!container) return;
+        // create spreads but don't show them until images are loaded to avoid size jumps
+        const spreadEls = [];
+        spreads.forEach((group, idx)=>{
+          const typeClass = group.length === 1 ? ' single' : ' double';
+          const el = document.createElement('div'); el.className = 'spread' + typeClass + ' hidden';
+          group.forEach(f=>{ const img = document.createElement('img'); img.src = 'Menu/' + encodeURIComponent(f); el.appendChild(img); });
+          container.appendChild(el);
+          spreadEls.push(el);
+        });
+
+        const allImgs = Array.from(container.querySelectorAll('img'));
+        function waitAll(imgs){
+          return Promise.all(imgs.map(img => new Promise(r => {
+            if(img.complete) return r();
+            img.onload = img.onerror = () => r();
+          })));
+        }
+
+        let cur = 0;
+        function show(i){ if(i<0||i>=spreadEls.length) return; spreadEls[cur].classList.remove('current'); spreadEls[cur].classList.add('hidden'); spreadEls[i].classList.remove('hidden'); spreadEls[i].classList.add('current'); cur=i; }
+
+        waitAll(allImgs).then(()=>{
+          if(spreadEls[0]){ spreadEls[0].classList.remove('hidden'); spreadEls[0].classList.add('current'); }
+        });
+
+        document.getElementById('menu-prev').addEventListener('click', ()=> show(Math.max(0, cur-1)));
+        document.getElementById('menu-next').addEventListener('click', ()=> show(Math.min(spreadEls.length-1, cur+1)));
+      })();
 
       // Reduced motion: show text immediately and skip long anims
       if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
